@@ -1,4 +1,13 @@
-Project Requirements
+# Interactive Graphics Final Project
+
+## Team Monnezza
+- Davide Timperi 1950722
+- Alexandru Vivian Pita 1948533
+- Federico Mendiola 1986026
+
+___
+
+# Project Requirements
 
 Interactive Graphics Course
 Prof. Marco Schaerf
