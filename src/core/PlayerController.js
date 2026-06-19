@@ -238,7 +238,7 @@ export class PlayerController {
         }
     }
 
-    // AI DEL MOSTRO: Target Tracking e Pathing Lineare sul piano orizzontale
+    // AI DEL MOSTRO: Target Tracking e Pathing Lineare sul piano orizzontale con prevenzione collisioni (muri)
     _updateMostroAI(mostroMesh, deltaTime) {
         // Calcolo del vettore di errore (Distanza relativa Giocatore - Mostro)
         const targetVector = new THREE.Vector3().subVectors(this.camera.position, mostroMesh.position);
@@ -251,9 +251,42 @@ export class PlayerController {
             // Allineamento dell'asse di beccheggio del mostro verso il target
             mostroMesh.lookAt(this.camera.position.x, mostroMesh.position.y, this.camera.position.z);
             
-            // Calcolo direzione unitaria e attuazione dello spostamento lineare
+            // Calcolo direzione unitaria
             targetVector.normalize();
-            mostroMesh.position.addScaledVector(targetVector, this.mostroSpeed * deltaTime);
+            const moveStep = targetVector.multiplyScalar(this.mostroSpeed * deltaTime);
+
+            // Risoluzione delle collisioni con scorrimento lungo gli assi (X e Z) per evitare di attraversare i muri
+            const monsterSize = new THREE.Vector3(1.2, 2.8, 1.2);
+
+            // 1. Prova a muovere lungo l'asse X
+            const futurePosX = mostroMesh.position.clone();
+            futurePosX.x += moveStep.x;
+            const boxX = new THREE.Box3().setFromCenterAndSize(futurePosX, monsterSize);
+            let collideX = false;
+            for (let i = 0; i < this.collisionObjects.length; i++) {
+                if (boxX.intersectsBox(this.collisionObjects[i])) {
+                    collideX = true;
+                    break;
+                }
+            }
+            if (!collideX) {
+                mostroMesh.position.x = futurePosX.x;
+            }
+
+            // 2. Prova a muovere lungo l'asse Z
+            const futurePosZ = mostroMesh.position.clone();
+            futurePosZ.z += moveStep.z;
+            const boxZ = new THREE.Box3().setFromCenterAndSize(futurePosZ, monsterSize);
+            let collideZ = false;
+            for (let i = 0; i < this.collisionObjects.length; i++) {
+                if (boxZ.intersectsBox(this.collisionObjects[i])) {
+                    collideZ = true;
+                    break;
+                }
+            }
+            if (!collideZ) {
+                mostroMesh.position.z = futurePosZ.z;
+            }
             
             // Notifica al Regista (Studente C) che il mostro sta camminando (può far oscillare le braccia via Tween)
             this._dispatchGlobalEvent('mostroInMovimento', { mostro: mostroMesh, isMoving: true });

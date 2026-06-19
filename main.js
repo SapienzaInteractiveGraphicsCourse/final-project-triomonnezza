@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PlayerController } from './src/core/PlayerController.js';
+import { Monster } from './src/entities/Monster.js';
 
 // ==========================================
 // 1. SETUP DELLA SCENA MINIMALE (WEBGL)
@@ -62,9 +63,10 @@ triggerZones.push({
 });
 
 // ==========================================
-// 3. SIMULAZIONE DEL MOSTRO (CUBO VIOLA)
+// 3. SIMULAZIONE DEL MOSTRO (CREATURA ARTICOLATA)
 // ==========================================
-const mostroMesh = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1.5), new THREE.MeshBasicMaterial({ color: 0xff00ff }));
+const monster = new Monster();
+const mostroMesh = monster.getMesh();
 mostroMesh.position.set(12, 1.5, -20); // Abbastanza lontano per non aggrare subito
 scene.add(mostroMesh);
 
@@ -97,7 +99,7 @@ document.addEventListener('horrorTrigger', (e) => {
 });
 
 document.addEventListener('playerMorto', () => {
-    alert("GAME OVER: Il cubo viola ti ha catturato!");
+    alert("GAME OVER: Sei stato sconfitto!");
     window.location.reload();
 });
 
@@ -113,6 +115,14 @@ function animate() {
     
     // Aggiorna il tuo controller passando il mostro di test
     player.update(deltaTime, mostroMesh);
+    
+    // Determina se il mostro è in movimento (inseguimento attivo ed entro il raggio di aggro)
+    const targetVector = new THREE.Vector3().subVectors(camera.position, mostroMesh.position);
+    targetVector.y = 0;
+    const distanza = targetVector.length();
+    const isMoving = player.controls.isLocked && distanza <= player.mostroAggroRadius && distanza > player.mostroDamageRadius;
+    
+    monster.update(deltaTime, isMoving);
     
     renderer.render(scene, camera);
 }
