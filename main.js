@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PlayerController } from './PlayerController.js';
+import { PlayerController } from './src/core/PlayerController.js';
 
 // ==========================================
 // 1. SETUP DELLA SCENA MINIMALE (WEBGL)

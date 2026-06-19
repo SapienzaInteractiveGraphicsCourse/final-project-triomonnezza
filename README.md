@@ -1,11 +1,86 @@
-# Interactive Graphics Final Project
+# 🎮 Horror Labyrinth — Interactive Graphics Final Project
 
-## Team Monnezza
-- Davide Timperi 1950722
-- Alexandru Vivian Pita 1948533
-- Federico Mendiola 1986026
+## 🔗 GitHub Pages Live Demo
+> **TODO**: Aggiungere il link dopo l'attivazione di GitHub Pages
+> `https://<username>.github.io/<repo-name>/`
 
-___
+---
+
+## 👥 Team: Trio Monnezza
+| Ruolo | Studente | Matricola |
+|---|---|---|
+| 🎨 Artista (Davide) | Davide Timperi | 1950722 |
+| ⚙️ Ingegnere (Alessandro) | Alexandru Vivian Pita | 1948533 |
+| 🎬 Regista (Federico) | Federico Mendiola | 1986026 |
+
+---
+
+## 🗂️ Struttura del Progetto
+
+```
+final-project-triomonnezza/
+├── index.html                   ← Entry point, HUD HTML/CSS (Davide)
+├── main.js                      ← Bootstrap + game loop principale
+│
+├── src/
+│   ├── core/                    ← ALESSANDRO (Ingegnere)
+│   │   ├── PlayerController.js  ← WASD, PointerLock, Raycaster, collisioni
+│   │   └── MonsterAI.js         ← Logica di inseguimento e pathfinding
+│   │
+│   ├── world/                   ← DAVIDE (Artista)
+│   │   ├── LightingSetup.js     ← Torcia, luci corridoio, sfarfallio
+│   │   ├── TextureLoader.js     ← Color/Normal/Specular map centralizzate
+│   │   ├── CollisionBuilder.js  ← AABB Bounding Box da mesh
+│   │   └── maps/
+│   │       ├── Map1.js          ← "Il Sanatorio" — Mappa 1
+│   │       └── Map2.js          ← "L'Ospedale"   — Mappa 2
+│   │
+│   ├── entities/
+│   │   └── Monster.js           ← Modello gerarchico mostro (Alessandro + Federico)
+│   │
+│   ├── animations/              ← FEDERICO (Regista)
+│   │   ├── TweenManager.js      ← Porte, raccolta oggetti, jumpscare via tween.js
+│   │   └── MonsterAnimator.js   ← Animazioni gerarchiche mostro (braccia, corpo)
+│   │
+│   └── ui/                      ← DAVIDE (Artista)
+│       ├── HUD.js               ← Mirino, torcia, messaggi, game over
+│       └── MenuManager.js       ← Menu principale, selezione mappa, pausa
+│
+├── assets/
+│   ├── textures/
+│   │   ├── walls/               ← wall_color/normal/specular.jpg
+│   │   ├── floors/              ← floor_wet/dry color/normal/specular.jpg
+│   │   └── ceiling/             ← ceiling_color/normal.jpg
+│   └── sounds/                  ← effetti audio
+│
+└── libs/                        ← librerie locali (opzionale per offline)
+```
+
+---
+
+## 🎯 Divisione dei Compiti
+
+### 🎨 Davide — Artista (Fase 1)
+- `src/world/LightingSetup.js` — torcia, luci corridoio con flickering matematico
+- `src/world/TextureLoader.js` — texture Color + Normal + Specular (requisito prof)
+- `src/world/CollisionBuilder.js` — Bounding Box per i muri
+- `src/world/maps/Map1.js` — layout 3D della prima mappa
+- `src/world/maps/Map2.js` — layout 3D della seconda mappa
+- `src/ui/HUD.js` — interfaccia in-game (mirino, batteria torcia, messaggi)
+- `src/ui/MenuManager.js` — menu principale, selezione mappa, pausa
+- `index.html` — struttura DOM, grafica HUD in HTML/CSS
+
+### ⚙️ Alessandro — Ingegnere (Fase 1)
+- `src/core/PlayerController.js` — WASD, PointerLock, Raycaster, AABB collisions
+- `src/core/MonsterAI.js` — logica di inseguimento, aggro radius
+- `src/entities/Monster.js` — geometria gerarchica del mostro
+- `main.js` — game loop, setup scena, coordinamento moduli
+
+### 🎬 Federico — Regista (Fase 2)
+- `src/animations/TweenManager.js` — tutti i Tween (porte, jumpscare, raccolta)
+- `src/animations/MonsterAnimator.js` — animazioni gerarchiche mostro via JS
+
+---
 
 # Project Requirements
 
