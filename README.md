@@ -8,7 +8,7 @@
 ## 👥 Team: Trio Monnezza
 | Ruolo | Studente | Matricola |
 |---|---|---|
-| 🎨 Artista (Davide) | Davide Timperi | 1950722 |
+| | Davide Timperi | 1950722 |
 | ⚙️ Ingegnere (Alessandro) | Alexandru Vivian Pita | 1948533 |
 | 🎬 Regista (Federico) | Federico Mendiola | 1986026 |
 
