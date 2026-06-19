@@ -43,6 +43,26 @@
             height: 14px;
             box-shadow: 0 0 8px #ff0000;
         }
+        /* HUD della Stamina */
+        #stamina-container {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 200px;
+            height: 15px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #333;
+            border-radius: 4px;
+            z-index: 10;
+            overflow: hidden;
+        }
+        #stamina-bar {
+            width: 100%;
+            height: 100%;
+            background-color: #00ffaa;
+            box-shadow: 0 0 10px #00ffaa;
+            transition: width 0.05s linear;
+        }
         /* Istruzioni iniziali / Schermata di sblocco mouse */
         #instructions {
             position: absolute;
@@ -112,7 +132,6 @@
         }
     </style>
 
-    <!-- IMPORT MAP: Risolve i Bare Imports di Three.js nel browser per i moduli ES6 -->
     <script type="importmap">
       {
         "imports": {
@@ -124,32 +143,33 @@
 </head>
 <body>
 
-    <!-- Schermata di blocco puntatore iniziale richiesta dal PointerLockControls -->
     <div id="instructions">
         <h1>Horror Test Sandbox</h1>
         <p>Clicca in qualunque punto per iniziare a giocare</p>
         <ul class="controls-list">
             <li><span class="kbd">W</span> <span class="kbd">A</span> <span class="kbd">S</span> <span class="kbd">D</span> o <span class="kbd">Frecce</span> - Movimento</li>
+            <li><span class="kbd">Space</span> - Scatto con stamina limitata</li>
             <li><span class="kbd">Mouse</span> - Guarda in giro</li>
             <li><span class="kbd">E</span> - Interagisci (Raccogli chiavi / Apri porte)</li>
             <li><span class="kbd">ESC</span> - Pausa / Sblocca cursore</li>
         </ul>
     </div>
 
-    <!-- Mirino dinamico per l'interazione -->
     <div id="crosshair"></div>
 
-    <!-- Messaggi di avviso UI (es. porta serrata) -->
+    <div id="stamina-container">
+        <div id="stamina-bar"></div>
+    </div>
+
     <div id="hud-messages"></div>
 
-    <!-- Script principale del gioco (caricato come modulo ES6) -->
     <script type="module" src="main.js"></script>
 
     <script>
-        // Gestione degli elementi dell'interfaccia grafica (UI) basata sugli eventi scatenati dal PlayerController
         const instructions = document.getElementById('instructions');
         const crosshair = document.getElementById('crosshair');
         const hudMessages = document.getElementById('hud-messages');
+        const staminaBar = document.getElementById('stamina-bar');
         let msgTimeout;
 
         // Nascondi/Mostra la schermata iniziale in base al PointerLock
@@ -158,6 +178,19 @@
                 instructions.style.display = 'none';
             } else {
                 instructions.style.display = 'flex';
+            }
+        });
+
+        // Ascolta l'evento di cambio stamina inviato dal PlayerController
+        document.addEventListener('staminaChanged', (e) => {
+            const percentuale = e.detail.percentuale;
+            staminaBar.style.width = percentuale + '%';
+            
+            // Feedback visivo se la stamina è esaurita
+            if (percentuale <= 0) {
+                staminaBar.style.backgroundColor = '#ff3333';
+            } else {
+                staminaBar.style.backgroundColor = '#00ffaa';
             }
         });
 

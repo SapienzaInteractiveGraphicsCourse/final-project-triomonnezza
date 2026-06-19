@@ -13,12 +13,22 @@ export class PlayerController {
         // 1. Setup Controlli Cinematici (Pointer Lock)
         this.controls = new PointerLockControls(this.camera, this.domElement);
         
-        // 2. Vettori di Stato del Giocatore
+        // 2. Vettori di Stato del Giocatore e Parametri di Movimento
         this.velocity = new THREE.Vector3();
         this.direction = new THREE.Vector3();
-        this.moveSpeed = 45.0; 
+        this.baseMoveSpeed = 45.0;  // Velocità di camminata standard
+        this.sprintMoveSpeed = 85.0; // Velocità raddoppiata durante lo scatto
+        this.moveSpeed = this.baseMoveSpeed; 
         this.friction = 10.0;  
         this.playerSize = new THREE.Vector3(0.8, 2.0, 0.8); // Dimensioni scatola di collisione utente
+
+        // --- SISTEMA DI STAMINA ---
+        this.maxStamina = 4.0;       // Dura 4 secondi di corsa continua
+        this.stamina = this.maxStamina;
+        this.staminaRegenRate = this.maxStamina / 2.0; // Si ricarica totalmente in 2 secondi (2.0 unità al secondo)
+        this.staminaDrainRate = 1.0; // Consuma 1 unità al secondo mentre corre
+        this.isSprinting = false;
+        // ---------------------------
 
         // 3. Stato di Gioco & Logica di Inventario
         this.salute = 100;
@@ -35,12 +45,12 @@ export class PlayerController {
         this.mostroDamageRadius = 1.2;// Distanza di attacco (Game Over)
 
         // 6. Registro Input da tastiera
-        this.keys = { forward: false, backward: false, left: false, right: false };
+        this.keys = { forward: false, backward: false, left: false, right: false, space: false };
 
         this._initInputListeners();
     }
 
-    // Inizializzazione dei sistemi di cattura degli input (Discreti e Continui)
+     // Inizializzazione dei sistemi di cattura degli input (Discreti e Continui)
     _initInputListeners() {
         document.addEventListener('keydown', (e) => this._onKeyDown(e));
         document.addEventListener('keyup', (e) => this._onKeyUp(e));
@@ -58,6 +68,7 @@ export class PlayerController {
             case 'KeyA': case 'ArrowLeft':  this.keys.left = true; break;
             case 'KeyS': case 'ArrowDown':  this.keys.backward = true; break;
             case 'KeyD': case 'ArrowRight': this.keys.right = true; break;
+            case 'Space':                   this.keys.space = true; break; // Barra Spaziatrice per correre
             case 'KeyE':                    this._interact(); break; 
         }
     }
@@ -68,12 +79,38 @@ export class PlayerController {
             case 'KeyA': case 'ArrowLeft':  this.keys.left = false; break;
             case 'KeyS': case 'ArrowDown':  this.keys.backward = false; break;
             case 'KeyD': case 'ArrowRight': this.keys.right = false; break;
+            case 'Space':                   this.keys.space = false; break;
         }
     }
+
 
     // LOOP PRINCIPALE DI AGGIORNAMENTO DINAMICO (Da invocare nel requestAnimationFrame globale)
     update(deltaTime, mostroMesh = null) {
         if (!this.controls.isLocked) return;
+
+         // --- GESTIONE DEI VALORI DELLA STAMINA E VELOCITÀ ---
+        const staMuovendo = this.keys.forward || this.keys.backward || this.keys.left || this.keys.right;
+
+        if (this.keys.space && staMuovendo && this.stamina > 0) {
+            this.isSprinting = true;
+            this.moveSpeed = this.sprintMoveSpeed;
+            this.stamina -= this.staminaDrainRate * deltaTime; // Consumo
+            if (this.stamina < 0) this.stamina = 0;
+        } else {
+            this.isSprinting = false;
+            this.moveSpeed = this.baseMoveSpeed;
+            // Ricarica solo se non si sta scattando
+            if (this.stamina < this.maxStamina) {
+                this.stamina += this.staminaRegenRate * deltaTime; // Ricarica rapida (in 2 secondi)
+                if (this.stamina > this.maxStamina) this.stamina = this.maxStamina;
+            }
+        }
+
+        // Invia l'evento UI della percentuale di stamina rimasta (0-100)
+        const percentualeStamina = (this.stamina / this.maxStamina) * 100;
+        this._dispatchGlobalEvent('staminaChanged', { percentuale: percentualeStamina });
+        // -----------------------------------------------------
+
 
         // 1. Modello di Attrito (Decelerazione esponenziale fittizia)
         this.velocity.x -= this.velocity.x * this.friction * deltaTime;
