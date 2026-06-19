@@ -1,8 +1,7 @@
 # 🎮 Horror Labyrinth — Interactive Graphics Final Project
 
 ## 🔗 GitHub Pages Live Demo
-> **TODO**: Aggiungere il link dopo l'attivazione di GitHub Pages
-> `https://<username>.github.io/<repo-name>/`
+**▶ [https://sapienzainteractivegraphicscourse.github.io/final-project-triomonnezza/](https://sapienzainteractivegraphicscourse.github.io/final-project-triomonnezza/)**
 
 ---
 
