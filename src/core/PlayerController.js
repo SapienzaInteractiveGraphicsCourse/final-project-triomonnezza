@@ -238,66 +238,147 @@ export class PlayerController {
         }
     }
 
-    // AI DEL MOSTRO: Target Tracking e Pathing Lineare sul piano orizzontale con prevenzione collisioni (muri)
+    // ─── COSTANTI AI ────────────────────────────────────────────────────────────
+    //  RAY_COUNT   : numero di raggi a ventaglio davanti al mostro
+    //  RAY_LEN     : lunghezza di ogni raggio (quanto "vede avanti")
+    //  STEER_ANGLE : ampiezza massima del ventaglio (radianti)
+    //  STUCK_TIME  : secondi immobili prima della mossa di fuga
+    // ────────────────────────────────────────────────────────────────────────────
+
+    // AI DEL MOSTRO: Ray-Steering con escape da angoli
     _updateMostroAI(mostroMesh, deltaTime) {
-        // Calcolo del vettore di errore (Distanza relativa Giocatore - Mostro)
-        const targetVector = new THREE.Vector3().subVectors(this.camera.position, mostroMesh.position);
-        targetVector.y = 0; // Proiezione vincolata sul piano XZ (Nessun movimento verticale spontaneo)
+        // Stato persistente inizializzato pigro (sopravvive ai frame)
+        if (this._aiState === undefined) {
+            this._aiState = {
+                stuckTimer: 0,           // secondi senza spostamento reale
+                lastPos: mostroMesh.position.clone(),
+                escapeDir: null,         // vettore di fuga temporaneo
+                escapeClock: 0,          // quanto dura la fuga
+                steerDir: new THREE.Vector3(), // direzione di steering corrente
+            };
+        }
+        const ai = this._aiState;
 
-        const distanzaEuclidea = targetVector.length();
+        // ── Vettore verso il giocatore ────────────────────────────────────────
+        const toPlayer = new THREE.Vector3().subVectors(this.camera.position, mostroMesh.position);
+        toPlayer.y = 0;
+        const distanzaEuclidea = toPlayer.length();
 
-        // Condizione di Inseguimento (Filtro di soglia per l'Aggro)
-        if (distanzaEuclidea <= this.mostroAggroRadius &&  distanzaEuclidea > this.mostroDamageRadius) {
-            // Allineamento dell'asse di beccheggio del mostro verso il target
-            mostroMesh.lookAt(this.camera.position.x, mostroMesh.position.y, this.camera.position.z);
-            
-            // Calcolo direzione unitaria
-            targetVector.normalize();
-            const moveStep = targetVector.multiplyScalar(this.mostroSpeed * deltaTime);
-
-            // Risoluzione delle collisioni con scorrimento lungo gli assi (X e Z) per evitare di attraversare i muri
-            const monsterSize = new THREE.Vector3(1.2, 2.8, 1.2);
-
-            // 1. Prova a muovere lungo l'asse X
-            const futurePosX = mostroMesh.position.clone();
-            futurePosX.x += moveStep.x;
-            const boxX = new THREE.Box3().setFromCenterAndSize(futurePosX, monsterSize);
-            let collideX = false;
-            for (let i = 0; i < this.collisionObjects.length; i++) {
-                if (boxX.intersectsBox(this.collisionObjects[i])) {
-                    collideX = true;
-                    break;
-                }
-            }
-            if (!collideX) {
-                mostroMesh.position.x = futurePosX.x;
-            }
-
-            // 2. Prova a muovere lungo l'asse Z
-            const futurePosZ = mostroMesh.position.clone();
-            futurePosZ.z += moveStep.z;
-            const boxZ = new THREE.Box3().setFromCenterAndSize(futurePosZ, monsterSize);
-            let collideZ = false;
-            for (let i = 0; i < this.collisionObjects.length; i++) {
-                if (boxZ.intersectsBox(this.collisionObjects[i])) {
-                    collideZ = true;
-                    break;
-                }
-            }
-            if (!collideZ) {
-                mostroMesh.position.z = futurePosZ.z;
-            }
-            
-            // Notifica al Regista (Studente C) che il mostro sta camminando (può far oscillare le braccia via Tween)
-            this._dispatchGlobalEvent('mostroInMovimento', { mostro: mostroMesh, isMoving: true });
-        } 
-        // Condizione di Impatto (Distanza critica raggiunta)
-        else if (distanzaEuclidea <= this.mostroDamageRadius) {
+        // ── Condizione di Impatto ─────────────────────────────────────────────
+        if (distanzaEuclidea <= this.mostroDamageRadius) {
             this.salute = 0;
             this.controls.unlock();
-            // Invia il segnale di fine gioco all'Artista (Mostra HUD di morte) e al Regista (Tween Jumpscare)
             this._dispatchGlobalEvent('playerMorto', { mostro: mostroMesh });
+            return;
         }
+
+        // ── Condizione di Inseguimento ────────────────────────────────────────
+        if (distanzaEuclidea > this.mostroAggroRadius) return;
+
+        mostroMesh.lookAt(this.camera.position.x, mostroMesh.position.y, this.camera.position.z);
+
+        const monsterSize  = new THREE.Vector3(1.2, 2.8, 1.2);
+        const RAY_LEN      = 2.5;  // distanza di "vista" davanti al mostro
+        const STEER_ANGLES = [-0.8, -0.4, 0, 0.4, 0.8]; // ventaglio di 5 raggi (rad)
+        const baseDir      = toPlayer.clone().normalize();
+
+        // ── Ray-casting a ventaglio ───────────────────────────────────────────
+        // Per ogni angolo del ventaglio controlla se la direzione è libera.
+        // Associa un punteggio: 0 = ostruito, (1 - |angolo|/max) = libero e vicino al target.
+        let bestScore = -1;
+        let bestDir   = baseDir.clone();
+
+        for (const angle of STEER_ANGLES) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            // Rotazione 2D attorno all'asse Y
+            const rayDir = new THREE.Vector3(
+                baseDir.x * cos - baseDir.z * sin,
+                0,
+                baseDir.x * sin + baseDir.z * cos
+            ).normalize();
+
+            // Prova la posizione in cima al raggio
+            const probePos = mostroMesh.position.clone().addScaledVector(rayDir, RAY_LEN);
+            const probeBox = new THREE.Box3().setFromCenterAndSize(probePos, monsterSize);
+
+            let ostruito = false;
+            for (let i = 0; i < this.collisionObjects.length; i++) {
+                if (probeBox.intersectsBox(this.collisionObjects[i])) {
+                    ostruito = true;
+                    break;
+                }
+            }
+
+            if (!ostruito) {
+                // Punteggio: privilegia il raggio più allineato con il giocatore
+                const score = 1.0 - Math.abs(angle) / (Math.PI * 0.5);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestDir   = rayDir;
+                }
+            }
+        }
+
+        // ── Fuga da angolo: se bloccato da >STUCK_TIME secondi ───────────────
+        const movedDist = mostroMesh.position.distanceTo(ai.lastPos);
+        ai.lastPos.copy(mostroMesh.position);
+
+        if (movedDist < 0.01) {
+            ai.stuckTimer += deltaTime;
+        } else {
+            ai.stuckTimer = 0;
+            ai.escapeDir  = null;
+            ai.escapeClock = 0;
+        }
+
+        if (ai.stuckTimer > 1.5) {
+            // Genera una direzione di fuga perpendicolare al giocatore
+            if (!ai.escapeDir) {
+                ai.escapeDir = new THREE.Vector3(
+                    -baseDir.z + (Math.random() - 0.5) * 0.6,
+                    0,
+                    baseDir.x + (Math.random() - 0.5) * 0.6
+                ).normalize();
+                ai.escapeClock = 0.6; // dura 0.6 s
+            }
+            if (ai.escapeClock > 0) {
+                ai.escapeClock -= deltaTime;
+                bestDir = ai.escapeDir;
+            } else {
+                ai.stuckTimer = 0;
+                ai.escapeDir  = null;
+            }
+        }
+
+        // ── Smooth steering: interpola gradualmente verso bestDir ─────────────
+        ai.steerDir.lerp(bestDir, Math.min(1, deltaTime * 8));
+        ai.steerDir.y = 0;
+        if (ai.steerDir.lengthSq() < 0.0001) ai.steerDir.copy(bestDir);
+        ai.steerDir.normalize();
+
+        const moveStep = ai.steerDir.clone().multiplyScalar(this.mostroSpeed * deltaTime);
+
+        // ── Collisione sliding separata per X e Z ─────────────────────────────
+        const futurePosX = mostroMesh.position.clone();
+        futurePosX.x += moveStep.x;
+        const boxX = new THREE.Box3().setFromCenterAndSize(futurePosX, monsterSize);
+        let collideX = false;
+        for (let i = 0; i < this.collisionObjects.length; i++) {
+            if (boxX.intersectsBox(this.collisionObjects[i])) { collideX = true; break; }
+        }
+        if (!collideX) mostroMesh.position.x = futurePosX.x;
+
+        const futurePosZ = mostroMesh.position.clone();
+        futurePosZ.z += moveStep.z;
+        const boxZ = new THREE.Box3().setFromCenterAndSize(futurePosZ, monsterSize);
+        let collideZ = false;
+        for (let i = 0; i < this.collisionObjects.length; i++) {
+            if (boxZ.intersectsBox(this.collisionObjects[i])) { collideZ = true; break; }
+        }
+        if (!collideZ) mostroMesh.position.z = futurePosZ.z;
+
+        this._dispatchGlobalEvent('mostroInMovimento', { mostro: mostroMesh, isMoving: true });
     }
 
     // Interfaccia di comunicazione ad eventi per disaccoppiare il codice
