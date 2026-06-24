@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { PlayerController } from './src/core/PlayerController.js';
 import { Monster } from './src/entities/Monster.js';
+import { MapEasy } from './src/world/maps/MapEasy.js';
+import { MapMedium } from './src/world/maps/MapMedium.js';
+import { MapHard } from './src/world/maps/MapHard.js';
 
 // ==========================================
 // 1. SETUP DELLA SCENA MINIMALE (WEBGL)
@@ -13,69 +16,50 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Luce ambientale minima per vedere i tuoi blocchi di test
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+// Luce ambientale minima
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
 scene.add(ambientLight);
 
-// ==========================================
-// 2. SIMULAZIONE DEL LAVORO DI B (MURI E TRIGGER)
-// ==========================================
-const collisionBoxes = []; // Array di THREE.Box3 che riempirai tu ora
-const triggerZones = [];
-
-// PAVIMENTO (Giusto per avere un riferimento visivo)
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshBasicMaterial({ color: 0x222222 }));
-floor.rotation.x = -Math.PI / 2;
-scene.add(floor);
-
-// CORPO DI COLLISIONE 1: Un muro invisibile/visibile (CUBO ROSSO)
-const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-wallMesh.position.set(0, 2, -10); // Posizionato a 10 metri davanti allo spawn
-scene.add(wallMesh);
-// Crei la bounding box matematica e la metti nell'array delle collisioni
-collisionBoxes.push(new THREE.Box3().setFromObject(wallMesh));
-
-// OGGETTO INTERATTIVO 1: Una Chiave di test (CUBO GIALLO)
-const chiaveMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
-chiaveMesh.position.set(-3, 1, -5); 
-chiaveMesh.name = "Chiave_Serratura_A";
-chiaveMesh.userData = { isInteractive: true, tipo: "chiave", idChiave: "chiave_atrio" };
-scene.add(chiaveMesh);
-// Nota: Le chiavi le aggiungiamo alla scena così il tuo Raycaster le interseca
-scene.add(chiaveMesh);
-
-// OGGETTO INTERATTIVO 2: Una Porta bloccata (CUBO BLU)
-const portaMesh = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 0.2), new THREE.MeshBasicMaterial({ color: 0x0000ff }));
-portaMesh.position.set(3, 2, -5);
-portaMesh.name = "Portone_Atrio";
-portaMesh.userData = { isInteractive: true, tipo: "porta", richiedeChiave: true, idChiave: "chiave_atrio" };
-scene.add(portaMesh);
-
-// SIMULAZIONE DI UN TRIGGER AD AREA: Zona di Spavento invisibile (CUBO VERDE SEMI-TRASPARENTE)
-const triggerMesh = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.2 }));
-triggerMesh.position.set(0, 2, -15); // Dietro il primo muro rosso
-scene.add(triggerMesh);
-// Crei la struttura dati del trigger da passare al tuo controller
-triggerZones.push({
-    box: new THREE.Box3().setFromObject(triggerMesh),
-    nome: "JUMPSCARE_CORRIDOIO_1",
-    giaAttivato: false
-});
-
-// ==========================================
-// 3. SIMULAZIONE DEL MOSTRO (CREATURA ARTICOLATA)
-// ==========================================
+// Variabili globali per mappa e player
+let currentMap = null;
+let player = null;
+let mostroMesh = null;
 const monster = new Monster();
-const mostroMesh = monster.getMesh();
-mostroMesh.position.set(12, 1.5, -20); // Abbastanza lontano per non aggrare subito
-scene.add(mostroMesh);
 
 // ==========================================
-// 4. INIZIALIZZAZIONE DEL TUO CONTROLLER ROBOTICO
+// 2. INIZIALIZZAZIONE GIOCO (Richiamata dal menu)
 // ==========================================
-camera.position.set(0, 1.8, 0); // Altezza occhi (1.8 metri)
-scene.add(camera);
-const player = new PlayerController(camera, renderer.domElement, collisionBoxes, triggerZones);
+document.addEventListener('startGameEvent', (e) => {
+    const difficulty = e.detail.difficulty;
+    
+    // Pulisci vecchie mesh se presenti (per restart futuro)
+    if (currentMap) {
+        // ... in futuro gestione pulizia scena
+    }
+
+    if (difficulty === 'easy') currentMap = new MapEasy(scene);
+    else if (difficulty === 'medium') currentMap = new MapMedium(scene);
+    else if (difficulty === 'hard') currentMap = new MapHard(scene);
+
+    currentMap.load();
+    const collisionBoxes = currentMap.getCollisionBoxes();
+    const triggerZones = currentMap.getTriggerZones();
+
+    // Spawn mostro
+    mostroMesh = monster.getMesh();
+    mostroMesh.position.set(12, 1.5, -20); 
+    scene.add(mostroMesh);
+
+    // Controller
+    camera.position.set(0, 1.8, 0); 
+    scene.add(camera);
+    player = new PlayerController(camera, renderer.domElement, collisionBoxes, triggerZones);
+
+    // Click su instructions avvia il gioco effettivo sbloccando il puntatore
+    document.getElementById('instructions').addEventListener('click', () => {
+        if (player) player.controls.lock();
+    });
+});
 
 // ==========================================
 // 5. ASCOLTO DEGLI EVENTI (Test disaccoppiamento C)
@@ -113,16 +97,18 @@ function animate() {
     
     const deltaTime = clock.getDelta();
     
-    // Aggiorna il tuo controller passando il mostro di test
-    player.update(deltaTime, mostroMesh);
-    
-    // Determina se il mostro è in movimento (inseguimento attivo ed entro il raggio di aggro)
-    const targetVector = new THREE.Vector3().subVectors(camera.position, mostroMesh.position);
-    targetVector.y = 0;
-    const distanza = targetVector.length();
-    const isMoving = player.controls.isLocked && distanza <= player.mostroAggroRadius && distanza > player.mostroDamageRadius;
-    
-    monster.update(deltaTime, isMoving);
+    if (player && mostroMesh) {
+        // Aggiorna il controller passando il mostro
+        player.update(deltaTime, mostroMesh);
+        
+        // Determina se il mostro è in movimento
+        const targetVector = new THREE.Vector3().subVectors(camera.position, mostroMesh.position);
+        targetVector.y = 0;
+        const distanza = targetVector.length();
+        const isMoving = player.controls.isLocked && distanza <= player.mostroAggroRadius && distanza > player.mostroDamageRadius;
+        
+        monster.update(deltaTime, isMoving);
+    }
     
     renderer.render(scene, camera);
 }
@@ -135,7 +121,4 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Aggiungi questo in fondo a main.js per intercettare il click sulla schermata di istruzioni
-document.getElementById('instructions').addEventListener('click', () => {
-    player.controls.lock();
-});
+// (Listener spostato dentro startGameEvent per evitare errori se player non è pronto)

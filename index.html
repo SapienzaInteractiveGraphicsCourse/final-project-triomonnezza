@@ -70,7 +70,7 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.85);
             color: #ffffff;
-            display: flex;
+            display: none; /* Inizialmente nascosto */
             flex-direction: column;
             justify-content: center;
             align-items: center;
@@ -130,6 +130,75 @@
             border-radius: 5px;
             display: none;
         }
+
+        /* Aggiunte Menu Iniziale e Loading */
+        .overlay-screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.95);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 30;
+        }
+        
+        .glitch-text {
+            font-size: 4rem;
+            color: #aa0000;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #330000;
+            margin-bottom: 50px;
+        }
+
+        .menu-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .diff-btn {
+            background: transparent;
+            color: #fff;
+            border: 2px solid #555;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .diff-btn:hover {
+            border-color: #aa0000;
+            color: #aa0000;
+            box-shadow: 0 0 15px rgba(170, 0, 0, 0.5);
+            transform: scale(1.05);
+        }
+
+        .loading-bar-container {
+            width: 300px;
+            height: 20px;
+            border: 2px solid #555;
+            margin-top: 20px;
+        }
+
+        #loading-bar-fill {
+            width: 0%;
+            height: 100%;
+            background: #aa0000;
+            transition: width 0.1s linear;
+        }
+
+        #loading-text {
+            margin-top: 15px;
+            color: #aaa;
+            font-style: italic;
+        }
     </style>
 
     <script type="importmap">
@@ -143,6 +212,23 @@
     </script>
 </head>
 <body>
+
+    <div id="main-menu" class="overlay-screen">
+        <h1 class="glitch-text">Trio Monnezza's<br>Horror Sandbox</h1>
+        <div class="menu-buttons">
+            <button class="diff-btn" data-diff="easy">Map Easy</button>
+            <button class="diff-btn" data-diff="medium">Map Medium</button>
+            <button class="diff-btn" data-diff="hard">Map Hard</button>
+        </div>
+    </div>
+
+    <div id="loading-screen" class="overlay-screen" style="display: none;">
+        <h2 style="color: #aa0000; font-size: 2.5rem;">Caricamento...</h2>
+        <div class="loading-bar-container">
+            <div id="loading-bar-fill"></div>
+        </div>
+        <p id="loading-text">Nascondendo le chiavi...</p>
+    </div>
 
     <div id="instructions">
         <h1>Horror Test Sandbox</h1>
@@ -171,10 +257,65 @@
         const crosshair = document.getElementById('crosshair');
         const hudMessages = document.getElementById('hud-messages');
         const staminaBar = document.getElementById('stamina-bar');
+        
+        const mainMenu = document.getElementById('main-menu');
+        const loadingScreen = document.getElementById('loading-screen');
+        const loadingBarFill = document.getElementById('loading-bar-fill');
+        const loadingText = document.getElementById('loading-text');
+        
         let msgTimeout;
+        let gameStarted = false;
+
+        const loadingPhrases = [
+            "Nascondendo le chiavi...",
+            "Risvegliando l'orrore...",
+            "Spegni la luce...",
+            "Generazione corridoi...",
+            "Non guardarti alle spalle...",
+            "Preparando i jumpscare..."
+        ];
+
+        // Gestione Menu Principale
+        document.querySelectorAll('.diff-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const diff = e.target.getAttribute('data-diff');
+                mainMenu.style.display = 'none';
+                loadingScreen.style.display = 'flex';
+                
+                // Animazione di loading fittizia
+                let progress = 0;
+                let phraseIndex = 0;
+                
+                const interval = setInterval(() => {
+                    progress += Math.random() * 15; // incremento casuale
+                    if (progress > 100) progress = 100;
+                    
+                    loadingBarFill.style.width = progress + '%';
+                    
+                    if (Math.random() > 0.6) {
+                        phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
+                        loadingText.innerText = loadingPhrases[phraseIndex];
+                    }
+                    
+                    if (progress === 100) {
+                        clearInterval(interval);
+                        setTimeout(() => {
+                            loadingScreen.style.display = 'none';
+                            instructions.style.display = 'flex';
+                            gameStarted = true;
+                            
+                            // Comunica a main.js di inizializzare la mappa scelta
+                            document.dispatchEvent(new CustomEvent('startGameEvent', { detail: { difficulty: diff } }));
+                        }, 600);
+                    }
+                }, 250);
+            });
+        });
 
         // Nascondi/Mostra la schermata iniziale in base al PointerLock
         document.addEventListener('pointerlockchange', () => {
+            if (!gameStarted) return; // Ignora se il gioco non è ancora iniziato
+
             if (document.pointerLockElement === document.body || document.pointerLockElement?.tagName === 'CANVAS') {
                 instructions.style.display = 'none';
             } else {
