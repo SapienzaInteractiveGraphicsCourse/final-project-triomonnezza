@@ -146,6 +146,17 @@
             z-index: 30;
         }
         
+        #fade-overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
         .glitch-text {
             font-size: 4rem;
             color: #aa0000;
@@ -206,12 +217,23 @@
         "imports": {
           "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
           "three/examples/jsm/controls/PointerLockControls.js": "https://unpkg.com/three@0.160.0/examples/jsm/controls/PointerLockControls.js",
+          "three/examples/jsm/loaders/FBXLoader.js": "https://unpkg.com/three@0.160.0/examples/jsm/loaders/FBXLoader.js",
+          "fflate": "https://unpkg.com/fflate@0.8.1/esm/browser.js",
           "@tweenjs/tween.js": "https://unpkg.com/@tweenjs/tween.js@21.0.0/dist/tween.esm.js"
         }
       }
     </script>
 </head>
 <body>
+    <!-- Div per visualizzare eventuali errori a schermo -->
+    <div id="error-log" style="position:absolute; top:10px; left:10px; color:red; z-index:9999; font-weight:bold; pointer-events:none; white-space:pre-wrap;"></div>
+    <script>
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            document.getElementById('error-log').innerText += '\n' + msg + ' (' + lineNo + ':' + columnNo + ')';
+            return false;
+        };
+    </script>
+    <div id="fade-overlay"></div>
 
     <div id="main-menu" class="overlay-screen">
         <h1 class="glitch-text">Trio Monnezza's<br>Horror Sandbox</h1>
@@ -223,22 +245,22 @@
     </div>
 
     <div id="loading-screen" class="overlay-screen" style="display: none;">
-        <h2 style="color: #aa0000; font-size: 2.5rem;">Caricamento...</h2>
+        <h2 style="color: #aa0000; font-size: 2.5rem;">Loading...</h2>
         <div class="loading-bar-container">
             <div id="loading-bar-fill"></div>
         </div>
-        <p id="loading-text">Nascondendo le chiavi...</p>
+        <p id="loading-text">Hiding keys...</p>
     </div>
 
     <div id="instructions">
         <h1>Horror Test Sandbox</h1>
-        <p>Clicca in qualunque punto per iniziare a giocare</p>
+        <p>Click anywhere to start playing</p>
         <ul class="controls-list">
-            <li><span class="kbd">W</span> <span class="kbd">A</span> <span class="kbd">S</span> <span class="kbd">D</span> o <span class="kbd">Frecce</span> - Movimento</li>
-            <li><span class="kbd">Space</span> - Scatto con stamina limitata</li>
-            <li><span class="kbd">Mouse</span> - Guarda in giro</li>
-            <li><span class="kbd">E</span> - Interagisci (Raccogli chiavi / Apri porte)</li>
-            <li><span class="kbd">ESC</span> - Pausa / Sblocca cursore</li>
+            <li><span class="kbd">W</span> <span class="kbd">A</span> <span class="kbd">S</span> <span class="kbd">D</span> or <span class="kbd">Arrows</span> - Movement</li>
+            <li><span class="kbd">Space</span> - Sprint (limited stamina)</li>
+            <li><span class="kbd">Mouse</span> - Look around</li>
+            <li><span class="kbd">E</span> - Interact (Collect keys / Open doors)</li>
+            <li><span class="kbd">ESC</span> - Pause / Unlock cursor</li>
         </ul>
     </div>
 
@@ -267,48 +289,66 @@
         let gameStarted = false;
 
         const loadingPhrases = [
-            "Nascondendo le chiavi...",
-            "Risvegliando l'orrore...",
-            "Spegni la luce...",
-            "Generazione corridoi...",
-            "Non guardarti alle spalle...",
-            "Preparando i jumpscare..."
+            "Hiding keys...",
+            "Awakening the horror...",
+            "Turn off the lights...",
+            "Generating corridors...",
+            "Don't look behind you...",
+            "Preparing jumpscares..."
         ];
+
+        const fadeOverlay = document.getElementById('fade-overlay');
 
         // Gestione Menu Principale
         document.querySelectorAll('.diff-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const diff = e.target.getAttribute('data-diff');
-                mainMenu.style.display = 'none';
-                loadingScreen.style.display = 'flex';
                 
-                // Animazione di loading fittizia
-                let progress = 0;
-                let phraseIndex = 0;
+                fadeOverlay.style.opacity = 1; // Fade to black
                 
-                const interval = setInterval(() => {
-                    progress += Math.random() * 15; // incremento casuale
-                    if (progress > 100) progress = 100;
+                setTimeout(() => {
+                    mainMenu.style.display = 'none';
+                    loadingScreen.style.display = 'flex';
+                    fadeOverlay.style.opacity = 0; // Fade in loading screen
                     
-                    loadingBarFill.style.width = progress + '%';
+                    // Animazione di loading fittizia
+                    let progress = 0;
+                    let phraseIndex = 0;
                     
-                    if (Math.random() > 0.6) {
-                        phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
-                        loadingText.innerText = loadingPhrases[phraseIndex];
-                    }
-                    
-                    if (progress === 100) {
-                        clearInterval(interval);
-                        setTimeout(() => {
-                            loadingScreen.style.display = 'none';
-                            instructions.style.display = 'flex';
-                            gameStarted = true;
+                    const interval = setInterval(() => {
+                        progress += Math.random() * 15; // incremento casuale
+                        if (progress > 100) progress = 100;
+                        
+                        loadingBarFill.style.width = progress + '%';
+                        
+                        if (Math.random() > 0.6) {
+                            phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
+                            loadingText.innerText = loadingPhrases[phraseIndex];
+                        }
+                        
+                        if (progress === 100) {
+                            clearInterval(interval);
                             
-                            // Comunica a main.js di inizializzare la mappa scelta
-                            document.dispatchEvent(new CustomEvent('startGameEvent', { detail: { difficulty: diff } }));
-                        }, 600);
-                    }
-                }, 250);
+                            fadeOverlay.style.opacity = 1; // Fade to black
+                            
+                            setTimeout(() => {
+                                loadingScreen.style.display = 'none';
+                                instructions.style.display = 'flex';
+                                gameStarted = true;
+                                
+                                fadeOverlay.style.opacity = 0; // Fade in instructions
+                                
+                                // Comunica a main.js di inizializzare la mappa scelta
+                                try {
+                                    document.dispatchEvent(new CustomEvent('startGameEvent', { detail: { difficulty: diff } }));
+                                } catch (err) {
+                                    document.getElementById('error-log').innerText += '\nError during game start: ' + err.message;
+                                    console.error(err);
+                                }
+                            }, 500);
+                        }
+                    }, 250);
+                }, 500);
             });
         });
 

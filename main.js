@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { PlayerController } from './src/core/PlayerController.js';
+import { PlayerController } from './src/core/PlayerController.js?v=8';
 import { Monster } from './src/entities/Monster.js';
-import { MapEasy } from './src/world/maps/MapEasy.js';
-import { MapMedium } from './src/world/maps/MapMedium.js';
-import { MapHard } from './src/world/maps/MapHard.js';
+import { MapEasy } from './src/world/maps/MapEasy.js?v=3';
+import { MapMedium } from './src/world/maps/MapMedium.js?v=2';
+import { MapHard } from './src/world/maps/MapHard.js?v=2';
 
 // ==========================================
 // 1. SETUP DELLA SCENA MINIMALE (WEBGL)
@@ -14,10 +14,12 @@ scene.background = new THREE.Color(0x111111); // Grigio scuro horror
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 // Luce ambientale minima
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.02); // Super scuro
 scene.add(ambientLight);
 
 // Variabili globali per mappa e player
@@ -47,7 +49,14 @@ document.addEventListener('startGameEvent', (e) => {
 
     // Spawn mostro
     mostroMesh = monster.getMesh();
-    mostroMesh.position.set(12, 1.5, -20); 
+    const spawnPos = currentMap.getMonsterSpawn();
+    mostroMesh.position.copy(spawnPos); 
+    mostroMesh.traverse((child) => {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+        }
+    });
     scene.add(mostroMesh);
 
     // Controller
@@ -83,7 +92,7 @@ document.addEventListener('horrorTrigger', (e) => {
 });
 
 document.addEventListener('playerMorto', () => {
-    alert("GAME OVER: Sei stato sconfitto!");
+    alert("GAME OVER: You have been defeated!");
     window.location.reload();
 });
 

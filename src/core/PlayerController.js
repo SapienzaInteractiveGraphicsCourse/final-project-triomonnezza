@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
 export class PlayerController {
     constructor(camera, domElement, collisionObjects, triggerZones) {
@@ -48,6 +49,71 @@ export class PlayerController {
         this.keys = { forward: false, backward: false, left: false, right: false, space: false };
 
         this._initInputListeners();
+        this._initFlashlight();
+    }
+
+    _initFlashlight() {
+        // Luce a cono della torcia (Ancora più potenziata)
+        this.flashlight = new THREE.SpotLight(0xffffff, 30.0); // Potenza raddoppiata
+        this.flashlight.position.set(0.3, -0.3, -0.3); // In basso a destra
+        this.flashlight.angle = Math.PI / 4; // Fascio più largo
+        this.flashlight.penumbra = 0.5; // Sfumatura morbida
+        this.flashlight.decay = 2.0;
+        this.flashlight.distance = 120; // Arriva molto più lontano
+        
+        // Abilita le ombre per la torcia
+        this.flashlight.castShadow = true;
+        this.flashlight.shadow.mapSize.width = 1024;
+        this.flashlight.shadow.mapSize.height = 1024;
+        this.flashlight.shadow.camera.near = 0.5;
+        this.flashlight.shadow.camera.far = 120;
+
+        // Target della luce
+        this.flashlight.target.position.set(0.3, -0.3, -2); // Punta sempre dritto davanti alla torcia
+
+        // Attacca tutto alla telecamera in modo che segua lo sguardo del giocatore
+        this.camera.add(this.flashlight);
+        this.camera.add(this.flashlight.target);
+
+        // Caricamento del modello 3D
+        const loader = new FBXLoader();
+        const textureLoader = new THREE.TextureLoader();
+        const texture = textureLoader.load('./assets/flashlight/flashlight/texture.png');
+        texture.colorSpace = THREE.SRGBColorSpace;
+        
+        // Luce per illuminare la torcia (non serve più col BasicMaterial ma lo lasciamo)
+        const weaponLight = new THREE.PointLight(0xffffff, 1.0, 3.0);
+        weaponLight.position.set(0.2, 0, -0.2); 
+        this.camera.add(weaponLight);
+
+        loader.load('./assets/flashlight/flashlight/flashlight.fbx', (object) => {
+            object.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    // Per il DEBUG usiamo un MeshBasicMaterial.
+                    // Questo ignora completamente le luci e mostra i colori puri della texture.
+                    child.material = new THREE.MeshBasicMaterial({
+                        map: texture,
+                        color: 0xffffff
+                    });
+                }
+            });
+            
+            // Scaliamo il modello in modo molto più aggressivo
+            object.scale.set(0.0003, 0.0003, 0.0003); 
+            
+            // Posiziona il modello 3D in basso a destra
+            object.position.set(0.3, -0.4, -0.5);
+            
+            // Ruotiamo la torcia. Se punta di lato, la giriamo sull'asse Y.
+            // Azzero le altre rotazioni per evitare che punti in alto o in basso.
+            object.rotation.set(0, Math.PI / 2, 0);
+
+            this.camera.add(object);
+            this.flashlightModel = object;
+        }, undefined, (error) => {
+            console.error("Errore caricamento FBX torcia:", error);
+        });
     }
 
      // Inizializzazione dei sistemi di cattura degli input (Discreti e Continui)
