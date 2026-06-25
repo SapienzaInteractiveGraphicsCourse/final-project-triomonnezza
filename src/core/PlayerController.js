@@ -13,6 +13,8 @@ export class PlayerController {
 
         // 1. Setup Controlli Cinematici (Pointer Lock)
         this.controls = new PointerLockControls(this.camera, this.domElement);
+        // Ripristina l'altezza della telecamera perché PointerLockControls la resetta a y=0
+        this.camera.position.set(0, 1.8, 0);
         
         // 2. Vettori di Stato del Giocatore e Parametri di Movimento
         this.velocity = new THREE.Vector3();
@@ -48,13 +50,18 @@ export class PlayerController {
         // 6. Registro Input da tastiera
         this.keys = { forward: false, backward: false, left: false, right: false, space: false };
 
+        this.keys = { forward: false, backward: false, left: false, right: false, space: false };
+
+        this.flashState = 'OFF_START';
+        this.flashTimer = 1.0;
+
         this._initInputListeners();
         this._initFlashlight();
     }
 
     _initFlashlight() {
-        // Luce a cono della torcia (Ancora più potenziata)
-        this.flashlight = new THREE.SpotLight(0xffffff, 30.0); // Potenza raddoppiata
+        // Luce a cono della torcia (Potenza calibrata per materiali PBR fisicamente corretti)
+        this.flashlight = new THREE.SpotLight(0xffffff, 150.0); 
         this.flashlight.position.set(0.3, -0.3, -0.3); // In basso a destra
         this.flashlight.angle = Math.PI / 4; // Fascio più largo
         this.flashlight.penumbra = 0.5; // Sfumatura morbida
@@ -78,7 +85,7 @@ export class PlayerController {
         // Caricamento del modello 3D
         const loader = new FBXLoader();
         const textureLoader = new THREE.TextureLoader();
-        const texture = textureLoader.load('./assets/flashlight/flashlight/texture.png');
+        const texture = textureLoader.load('./assets/models/flashlight/texture.png');
         texture.colorSpace = THREE.SRGBColorSpace;
         
         // Luce per illuminare la torcia (non serve più col BasicMaterial ma lo lasciamo)
@@ -86,7 +93,7 @@ export class PlayerController {
         weaponLight.position.set(0.2, 0, -0.2); 
         this.camera.add(weaponLight);
 
-        loader.load('./assets/flashlight/flashlight/flashlight.fbx', (object) => {
+        loader.load('./assets/models/flashlight/flashlight.fbx', (object) => {
             object.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
@@ -153,6 +160,36 @@ export class PlayerController {
     // LOOP PRINCIPALE DI AGGIORNAMENTO DINAMICO (Da invocare nel requestAnimationFrame globale)
     update(deltaTime, mostroMesh = null) {
         if (!this.controls.isLocked) return;
+
+        // --- GESTIONE TORCIA (Flickering) ---
+        this.flashTimer -= deltaTime;
+        if (this.flashState === 'OFF_START') {
+            this.flashlight.intensity = 0;
+            if (this.flashTimer <= 0) {
+                this.flashState = 'START_FLICKER';
+                this.flashTimer = 2.0;
+            }
+        } else if (this.flashState === 'START_FLICKER') {
+            this.flashlight.intensity = Math.random() > 0.5 ? 150 : 0;
+            if (this.flashTimer <= 0) {
+                this.flashState = 'ON';
+                this.flashTimer = 10.0 + Math.random() * 5.0;
+                this.flashlight.intensity = 150;
+            }
+        } else if (this.flashState === 'ON') {
+            this.flashlight.intensity = 150;
+            if (this.flashTimer <= 0) {
+                this.flashState = 'FLICKER';
+                this.flashTimer = 1.0 + Math.random() * 1.0;
+            }
+        } else if (this.flashState === 'FLICKER') {
+            this.flashlight.intensity = Math.random() > 0.3 ? 150 : 0;
+            if (this.flashTimer <= 0) {
+                this.flashState = 'ON';
+                this.flashTimer = 10.0 + Math.random() * 10.0;
+                this.flashlight.intensity = 150;
+            }
+        }
 
          // --- GESTIONE DEI VALORI DELLA STAMINA E VELOCITÀ ---
         const staMuovendo = this.keys.forward || this.keys.backward || this.keys.left || this.keys.right;

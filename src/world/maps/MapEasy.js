@@ -1,49 +1,42 @@
-import { MapBase } from './MapBase.js?v=2';
+import * as THREE from 'three';
+import { MapBase } from './MapBase.js';
 
 export class MapEasy extends MapBase {
     load() {
-        this.monsterSpawn.set(0, 1.5, -20); // Spawn nel corridoio nord
+        console.log("Loading Hospital Map Easy...");
+
+        // Room 1 (Start) - Alto Sinistra (Nord-Ovest)
+        // Connette a Est e a Sud
+        this.buildHospitalRoom(0, 0, 3, 3, ['E_1', 'S_1']);
         
-        // Stanza Centrale (Spawn) - Collegate in tutte le direzioni
-        this.buildRoom(0, 0, 10, 10, ['N', 'S', 'E', 'W'], 0xffffff);
+        // Room 2 - Alto Destra (Nord-Est)
+        // Connette a Ovest (verso R1) e a Sud (verso R3)
+        this.buildHospitalRoom(12, 0, 3, 3, ['W_1', 'S_1']);
         
-        // Direzione NORD
-        this.buildHallway(0, -12.5, 4, 15, false);
-        this.buildRoom(0, -25, 10, 10, ['S', 'E', 'W'], 0xffaaaa);
+        // Room 3 (Goal) - Basso Destra (Sud-Est)
+        // Connette a Nord (verso R2) e a Ovest (verso R4)
+        this.buildHospitalRoom(12, 12, 3, 3, ['N_1', 'W_1']);
+        
+        // Room 4 - Basso Sinistra (Sud-Ovest)
+        // Connette a Nord (verso R1) e a Est (verso R3)
+        this.buildHospitalRoom(0, 12, 3, 3, ['N_1', 'E_1']);
 
-        // Direzione SUD
-        this.buildHallway(0, 12.5, 4, 15, false);
-        this.buildRoom(0, 25, 10, 10, ['N', 'E', 'W', 'GOAL_S'], 0xaaaaff); // GOAL QUI
+        // Aggiungiamo le porte (le porte si aprono interagendo, usiamo prop o le lasciamo aperte per ora)
+        // Inseriamo un paio di props sparsi
+        this.spawnAsset('bed.fbx', new THREE.Vector3(-2, 0, -2), 0, true);
+        this.spawnAsset('wheel_chair.fbx', new THREE.Vector3(2, 0, 2), Math.PI / 4, true);
+        this.spawnAsset('cabinet_1.fbx', new THREE.Vector3(14, 0, -2), -Math.PI / 2, true);
+        
+        // Inseriamo l'Exit Sign sopra la porta della Goal Room
+        this.spawnAsset('Exit_sign.fbx', new THREE.Vector3(12, 3, 6.2), 0, true); // Sopra l'ingresso N della R3
 
-        // Direzione EST
-        this.buildHallway(12.5, 0, 15, 4, true);
-        this.buildRoom(25, 0, 10, 10, ['W', 'N', 'S'], 0xaaffaa);
+        // Impostiamo lo spawn del giocatore (Centro della R1)
+        this.monsterSpawn = new THREE.Vector3(0, 1.5, 0);
 
-        // Direzione OVEST
-        this.buildHallway(-12.5, 0, 15, 4, true);
-        this.buildRoom(-25, 0, 10, 10, ['E', 'N', 'S'], 0xffffaa);
+        // Impostiamo il trigger per la vittoria nella Room 3
+        this.addTrigger(12, 2, 12, "GOAL_REACHED");
 
-        // Connessioni ad anello esterne (per fuggire)
-        // NORD -> EST
-        this.buildHallway(12.5, -25, 15, 4, true);
-        this.buildHallway(25, -12.5, 4, 15, false);
-        this.buildRoom(25, -25, 10, 10, ['W','S'], null); // Chiuso ai lati esterni
-
-        // EST -> SUD
-        this.buildHallway(25, 12.5, 4, 15, false);
-        this.buildHallway(12.5, 25, 15, 4, true);
-        this.buildRoom(25, 25, 10, 10, ['N','W'], null);
-
-        // SUD -> OVEST
-        this.buildHallway(-12.5, 25, 15, 4, true);
-        this.buildHallway(-25, 12.5, 4, 15, false);
-        this.buildRoom(-25, 25, 10, 10, ['N','E'], null);
-
-        // OVEST -> NORD
-        this.buildHallway(-25, -12.5, 4, 15, false);
-        this.buildHallway(-12.5, -25, 15, 4, true);
-        this.buildRoom(-25, -25, 10, 10, ['S','E'], null);
-
-        this.addTrigger(0, 2, -12.5, "JUMPSCARE_CORRIDOIO_NORD");
+        // Finta promessa o evento, in questo caso l'AssetManager ha già caricato tutto prima di chiamare load()
+        document.dispatchEvent(new Event('assetsLoadedEvent'));
     }
 }

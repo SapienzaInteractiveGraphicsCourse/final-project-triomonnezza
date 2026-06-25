@@ -1,9 +1,16 @@
 import * as THREE from 'three';
-import { PlayerController } from './src/core/PlayerController.js?v=8';
+import { PlayerController } from './src/core/PlayerController.js';
 import { Monster } from './src/entities/Monster.js';
-import { MapEasy } from './src/world/maps/MapEasy.js?v=3';
-import { MapMedium } from './src/world/maps/MapMedium.js?v=2';
-import { MapHard } from './src/world/maps/MapHard.js?v=2';
+import { MapEasy } from './src/world/maps/MapEasy.js';
+import { MapMedium } from './src/world/maps/MapMedium.js';
+import { MapHard } from './src/world/maps/MapHard.js';
+import { MapBase } from './src/world/maps/MapBase.js';
+import { MapTest } from './src/world/maps/MapTest.js';
+import { MapHospitalTest } from './src/world/maps/MapHospitalTest.js';
+import { HospitalAssetManager } from './src/world/HospitalAssetManager.js';
+
+// Avvia il caricamento in background fin da subito
+const globalAssetsPromise = HospitalAssetManager.preloadAll();
 
 // ==========================================
 // 1. SETUP DELLA SCENA MINIMALE (WEBGL)
@@ -18,8 +25,8 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// Luce ambientale minima
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.02); // Super scuro
+// Luce ambientale minima (adattata per materiali PBR GLTF)
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.15); // Aumentato per rendere visibile il PBR
 scene.add(ambientLight);
 
 // Variabili globali per mappa e player
@@ -31,7 +38,7 @@ const monster = new Monster();
 // ==========================================
 // 2. INIZIALIZZAZIONE GIOCO (Richiamata dal menu)
 // ==========================================
-document.addEventListener('startGameEvent', (e) => {
+document.addEventListener('startGameEvent', async (e) => {
     const difficulty = e.detail.difficulty;
     
     // Pulisci vecchie mesh se presenti (per restart futuro)
@@ -42,6 +49,14 @@ document.addEventListener('startGameEvent', (e) => {
     if (difficulty === 'easy') currentMap = new MapEasy(scene);
     else if (difficulty === 'medium') currentMap = new MapMedium(scene);
     else if (difficulty === 'hard') currentMap = new MapHard(scene);
+    else if (difficulty === 'test') currentMap = new MapTest(scene);
+    else if (difficulty === 'hospital_test') currentMap = new MapHospitalTest(scene);
+
+    // Aspetta il completamento del caricamento FBX globale (se ha già finito in background, passa istantaneamente)
+    await globalAssetsPromise;
+    
+    // Notifica la UI che gli asset sono stati caricati e il gioco può essere sbloccato
+    document.dispatchEvent(new Event('assetsLoadedEvent'));
 
     currentMap.load();
     const collisionBoxes = currentMap.getCollisionBoxes();
@@ -117,6 +132,10 @@ function animate() {
         const isMoving = player.controls.isLocked && distanza <= player.mostroAggroRadius && distanza > player.mostroDamageRadius;
         
         monster.update(deltaTime, isMoving);
+    }
+    
+    if (currentMap && currentMap.update) {
+        currentMap.update(deltaTime);
     }
     
     renderer.render(scene, camera);

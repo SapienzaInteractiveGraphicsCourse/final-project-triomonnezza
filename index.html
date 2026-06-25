@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Horror Sandbox - Test PlayerController</title>
+    <link rel="icon" type="image/x-icon" href="./assets/horror-16.ico">
     <style>
         * {
             box-sizing: border-box;
@@ -210,16 +211,26 @@
             color: #aaa;
             font-style: italic;
         }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.05); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .pulse-text {
+            animation: pulse 1.5s infinite ease-in-out;
+        }
     </style>
 
     <script type="importmap">
       {
         "imports": {
-          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-          "three/examples/jsm/controls/PointerLockControls.js": "https://unpkg.com/three@0.160.0/examples/jsm/controls/PointerLockControls.js",
-          "three/examples/jsm/loaders/FBXLoader.js": "https://unpkg.com/three@0.160.0/examples/jsm/loaders/FBXLoader.js",
-          "fflate": "https://unpkg.com/fflate@0.8.1/esm/browser.js",
-          "@tweenjs/tween.js": "https://unpkg.com/@tweenjs/tween.js@21.0.0/dist/tween.esm.js"
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/examples/jsm/controls/PointerLockControls.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/PointerLockControls.js",
+          "three/examples/jsm/loaders/FBXLoader.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/FBXLoader.js",
+          "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
+          "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.1/esm/browser.js",
+          "@tweenjs/tween.js": "https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@21.0.0/dist/tween.esm.js"
         }
       }
     </script>
@@ -236,16 +247,20 @@
     <div id="fade-overlay"></div>
 
     <div id="main-menu" class="overlay-screen">
-        <h1 class="glitch-text">Trio Monnezza's<br>Horror Sandbox</h1>
-        <div class="menu-buttons">
+        <h1 class="glitch-text" data-text="TRIO MONNEZZA">TRIO MONNEZZA</h1>
+      <p class="subtitle">Horror Sandbox</p>
+      
+      <div class="menu-buttons">
             <button class="diff-btn" data-diff="easy">Map Easy</button>
             <button class="diff-btn" data-diff="medium">Map Medium</button>
             <button class="diff-btn" data-diff="hard">Map Hard</button>
-        </div>
+            <button class="diff-btn test-btn" data-diff="test" style="color: #ffaa00; border-color: #ffaa00;">Test Assets Map</button>
+            <button class="diff-btn test-btn" data-diff="hospital_test" style="color: #00aaff; border-color: #00aaff; margin-top: 20px;">Test Hospital FBX</button>
+      </div>
     </div>
 
     <div id="loading-screen" class="overlay-screen" style="display: none;">
-        <h2 style="color: #aa0000; font-size: 2.5rem;">Loading...</h2>
+        <h2 class="pulse-text" style="color: #aa0000; font-size: 2.5rem;">Loading...</h2>
         <div class="loading-bar-container">
             <div id="loading-bar-fill"></div>
         </div>
@@ -304,52 +319,35 @@
             btn.addEventListener('click', (e) => {
                 const diff = e.target.getAttribute('data-diff');
                 
-                fadeOverlay.style.opacity = 1; // Fade to black
+                mainMenu.style.display = 'none';
+                loadingScreen.style.display = 'flex';
                 
-                setTimeout(() => {
-                    mainMenu.style.display = 'none';
-                    loadingScreen.style.display = 'flex';
-                    fadeOverlay.style.opacity = 0; // Fade in loading screen
-                    
-                    // Animazione di loading fittizia
-                    let progress = 0;
-                    let phraseIndex = 0;
-                    
-                    const interval = setInterval(() => {
-                        progress += Math.random() * 15; // incremento casuale
-                        if (progress > 100) progress = 100;
-                        
-                        loadingBarFill.style.width = progress + '%';
-                        
-                        if (Math.random() > 0.6) {
-                            phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
-                            loadingText.innerText = loadingPhrases[phraseIndex];
-                        }
-                        
-                        if (progress === 100) {
-                            clearInterval(interval);
-                            
-                            fadeOverlay.style.opacity = 1; // Fade to black
-                            
-                            setTimeout(() => {
-                                loadingScreen.style.display = 'none';
-                                instructions.style.display = 'flex';
-                                gameStarted = true;
-                                
-                                fadeOverlay.style.opacity = 0; // Fade in instructions
-                                
-                                // Comunica a main.js di inizializzare la mappa scelta
-                                try {
-                                    document.dispatchEvent(new CustomEvent('startGameEvent', { detail: { difficulty: diff } }));
-                                } catch (err) {
-                                    document.getElementById('error-log').innerText += '\nError during game start: ' + err.message;
-                                    console.error(err);
-                                }
-                            }, 500);
-                        }
-                    }, 250);
-                }, 500);
+                // Inizializza la barra a 0 (verrà aggiornata dinamicamente)
+                loadingBarFill.style.transition = 'width 0.1s linear';
+                loadingBarFill.style.width = '0%';
+                
+                // Avvia il caricamento lato game logic
+                try {
+                    document.dispatchEvent(new CustomEvent('startGameEvent', { detail: { difficulty: diff } }));
+                } catch (err) {
+                    document.getElementById('error-log').innerText += '\nError during game start: ' + err.message;
+                    console.error(err);
+                }
             });
+        });
+
+        // Aggiorna la barra di caricamento reale in base all'evento
+        document.addEventListener('assetProgressEvent', (e) => {
+            if (!gameStarted) {
+                loadingBarFill.style.width = e.detail.progress + '%';
+            }
+        });
+
+        // Quando il motore finisce di caricare, sblocca la UI
+        document.addEventListener('assetsLoadedEvent', () => {
+            loadingScreen.style.display = 'none';
+            instructions.style.display = 'flex';
+            gameStarted = true;
         });
 
         // Nascondi/Mostra la schermata iniziale in base al PointerLock

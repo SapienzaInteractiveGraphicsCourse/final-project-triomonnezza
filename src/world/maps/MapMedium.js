@@ -1,54 +1,44 @@
-import { MapBase } from './MapBase.js?v=2';
+import * as THREE from 'three';
+import { MapBase } from './MapBase.js';
 
 export class MapMedium extends MapBase {
     load() {
-        this.monsterSpawn.set(0, 1.5, -12.5); // Spawn vicino all'inizio ma coperto
+        console.log("Loading Hospital Map Medium...");
+
+        // Griglia 3x2 di stanze per garantire multipli percorsi
+        // R00 (0,0) Start
+        this.buildHospitalRoom(0, 0, 3, 3, ['E_1', 'S_1']);
         
-        // MapMedium: Più grande, loop disassati
-        // Spawn
-        this.buildRoom(0, 0, 10, 10, ['N', 'E'], 0xffcccc); 
-
-        // Nord Corridor
-        this.buildHallway(0, -12.5, 4, 15, false);
-        this.buildRoom(0, -25, 10, 10, ['S', 'E', 'W'], 0xccccff); 
-
-        // Ovest da Nord
-        this.buildHallway(-12.5, -25, 15, 4, true);
-        this.buildRoom(-25, -25, 10, 10, ['E', 'S'], 0xff5555);
-
-        // Sud da Ovest(-25,-25)
-        this.buildHallway(-25, -12.5, 4, 15, false);
-        this.buildRoom(-25, 0, 10, 10, ['N', 'S', 'E'], 0xccffff); 
-
-        // Sud da Ovest(-25,0)
-        this.buildHallway(-25, 12.5, 4, 15, false);
-        this.buildRoom(-25, 25, 10, 10, ['N', 'E'], 0xffdddd);
-
-        // Est da Ovest(-25,25) -> Sud(0,25)
-        this.buildHallway(-12.5, 25, 15, 4, true);
-        this.buildRoom(0, 25, 10, 10, ['W', 'E', 'N'], 0xddffdd); 
-        // Connetto (0,25) a (0,0)? No, facciamo un muro. In (0,0) abbiamo solo N, E.
-
-        // Est da (0,25)
-        this.buildHallway(12.5, 25, 15, 4, true);
-        this.buildRoom(25, 25, 10, 10, ['W', 'N', 'GOAL_S'], 0xffffaa); // GOAL QUI (25, 25)
-
-        // Est da Nord (0,-25)
-        this.buildHallway(12.5, -25, 15, 4, true);
-        this.buildRoom(25, -25, 10, 10, ['W', 'S'], 0xccffcc); 
-
-        // Sud da (25,-25)
-        this.buildHallway(25, -12.5, 4, 15, false);
-        this.buildRoom(25, 0, 10, 10, ['N', 'S', 'W'], 0xcccccc); 
-
-        // Ovest da (25,0) -> Chiude verso lo Spawn (0,0)
-        this.buildHallway(12.5, 0, 15, 4, true); 
-
-        // Sud da (25,0) -> Chiude verso il Goal (25,25)
-        this.buildHallway(25, 12.5, 4, 15, false);
+        // R10 (12,0)
+        this.buildHospitalRoom(12, 0, 3, 3, ['W_1', 'E_1', 'S_1']);
         
-        // Triggers
-        this.addTrigger(-12.5, 2, -25, "JUMPSCARE_MEDIUM_NW");
-        this.addTrigger(25, 2, 12.5, "JUMPSCARE_MEDIUM_SE");
+        // R20 (24,0)
+        this.buildHospitalRoom(24, 0, 3, 3, ['W_1', 'S_1']);
+        
+        // R01 (0,12)
+        this.buildHospitalRoom(0, 12, 3, 3, ['N_1', 'E_1']);
+        
+        // R11 (12,12)
+        this.buildHospitalRoom(12, 12, 3, 3, ['N_1', 'W_1', 'E_1']);
+        
+        // R21 (24,12) Goal
+        this.buildHospitalRoom(24, 12, 3, 3, ['N_1', 'W_1']);
+
+        // Più props per rendere la mappa più viva
+        this.spawnAsset('table.fbx', new THREE.Vector3(12, 0, 12), 0, true);
+        this.spawnAsset('chair.fbx', new THREE.Vector3(10, 0, 12), Math.PI/2, true);
+        this.spawnAsset('IV_Bag.fbx', new THREE.Vector3(22, 0, 2), 0, true);
+        this.spawnAsset('cabinet_2.fbx', new THREE.Vector3(0, 0, 10), Math.PI, true);
+        this.spawnAsset('bed.fbx', new THREE.Vector3(24, 0, -2), -Math.PI/2, true);
+        this.spawnAsset('wheel_chair.fbx', new THREE.Vector3(14, 0, 2), Math.PI/3, true);
+
+        // Uscita
+        this.spawnAsset('Exit_sign.fbx', new THREE.Vector3(24, 3, 6.2), 0, true); 
+
+        // Start & Trigger
+        this.monsterSpawn = new THREE.Vector3(0, 1.5, 0);
+        this.addTrigger(24, 2, 12, "GOAL_REACHED");
+
+        document.dispatchEvent(new Event('assetsLoadedEvent'));
     }
 }
