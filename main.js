@@ -5,6 +5,7 @@ import { MapEasy } from './src/world/maps/MapEasy.js';
 import { MapMedium } from './src/world/maps/MapMedium.js';
 import { MapHard } from './src/world/maps/MapHard.js';
 import { InteriorAssetManager } from './src/world/InteriorAssetManager.js';
+import * as TWEEN from '@tweenjs/tween.js';
 
 // ==========================================
 // 1. SETUP DELLA SCENA (WEBGL)
@@ -106,7 +107,27 @@ document.addEventListener('itemRaccolto', (e) => {
 });
 
 document.addEventListener('portaAperta', (e) => {
-    console.log(`[TWEEN]: Porta ${e.detail.object.name} aperta!`);
+    const doorMesh = e.detail.object;
+    if (doorMesh.userData.isOpen) return;
+
+    console.log(`[TWEEN]: Porta ${doorMesh.name || 'door'} aperta!`);
+    doorMesh.userData.isOpen = true;
+
+    // Remove collision box from the map so player can walk through
+    if (doorMesh.userData.collisionBox) {
+        doorMesh.userData.collisionBox.makeEmpty();
+    }
+
+    // Animate rotation (open 90 degrees)
+    const targetY = doorMesh.userData.startRotationY + (Math.PI / 2);
+    
+    new TWEEN.Tween(doorMesh.rotation)
+        .to({ y: targetY }, 800)
+        .easing(TWEEN.Easing.Quadratic.Out)
+        .start();
+        
+    // Optional: play sound or show message
+    document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: "Door Opened" } }));
 });
 
 document.addEventListener('horrorTrigger', (e) => {
@@ -125,6 +146,7 @@ const clock = new THREE.Clock();
 
 function animate() {
     requestAnimationFrame(animate);
+    TWEEN.update();
     const deltaTime = clock.getDelta();
 
     if (player && mostroMesh) {

@@ -31,6 +31,10 @@ export const interiorTiles = [
     'ceilingConcrete.glb',
     'wallBrick.glb',
     'wallDoorBrick.glb',
+
+    // Doors
+    'doorWood.glb',
+    'low_poly_psx_hinged_door.glb',
 ];
 
 // Props used by the maps (bed, chair, etc.)
@@ -116,6 +120,13 @@ class InteriorAssetManagerClass {
                             }
                         }
                     });
+
+                    if (filename === 'low_poly_psx_hinged_door.glb') {
+                        const box = new THREE.Box3().setFromObject(model);
+                        const size = new THREE.Vector3();
+                        box.getSize(size);
+                        console.log(`[DOOR DEBUG] BoundingBox Size: x=${size.x}, y=${size.y}, z=${size.z}`);
+                    }
 
                     this.models[filename] = model;
                     checkDone();

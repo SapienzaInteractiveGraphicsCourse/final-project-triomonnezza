@@ -225,6 +225,68 @@ export class MapBase {
             this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
         };
 
+        const spawnInteractiveDoor = (x, y, z, rotationY) => {
+            const mesh = InteriorAssetManager.get('low_poly_psx_hinged_door.glb');
+            if (!mesh) return;
+            
+            // 1. Reset mesh to measure raw size
+            mesh.position.set(0, 0, 0);
+            mesh.rotation.set(0, 0, 0);
+            mesh.scale.set(1, 1, 1);
+            mesh.updateMatrixWorld(true);
+            
+            const rawBox = new THREE.Box3().setFromObject(mesh);
+            const rawSize = new THREE.Vector3();
+            rawBox.getSize(rawSize);
+            
+            // 2. Calculate scaling to fit our 2.4 x 3.0 doorway
+            const targetWidth = 2.4;
+            const targetHeight = 3.0;
+            
+            const scaleX = targetWidth / (rawSize.x || 1);
+            const scaleY = targetHeight / (rawSize.y || 1);
+            const scaleZ = 1.0; // Keep depth normal
+            
+            mesh.scale.set(scaleX, scaleY, scaleZ);
+            mesh.updateMatrixWorld(true);
+            
+            const scaledBox = new THREE.Box3().setFromObject(mesh);
+            
+            // 3. Create a Hinge Group to allow correct swinging
+            const hinge = new THREE.Group();
+            
+            // Offset mesh so its left edge (min.x) and bottom (min.y) are at the hinge origin
+            mesh.position.set(-scaledBox.min.x, -scaledBox.min.y, -(scaledBox.min.z + scaledBox.max.z) / 2);
+            hinge.add(mesh);
+            
+            // 4. Position the hinge in world space
+            hinge.position.set(x, 0, z);
+            hinge.rotation.set(0, rotationY, 0);
+            // Move the hinge itself to the left edge of the doorway hole
+            hinge.translateX(-targetWidth / 2);
+            
+            const doorData = { 
+                isInteractive: true, 
+                tipo: 'porta', 
+                isOpen: false,
+                startRotationY: rotationY
+            };
+            
+            hinge.userData = doorData;
+            // The raycaster hits the mesh, so give it the same userData reference
+            mesh.traverse((child) => {
+                if (child.isMesh) child.userData = doorData;
+            });
+            
+            hinge.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(hinge);
+            hinge.userData.collisionBox = box;
+            
+            this.scene.add(hinge);
+            this.collisionBoxes.push(box);
+            return hinge;
+        };
+
         for (let i = 0; i < count; i++) {
             const hasDoor    = doorways.includes(`${side}_${i}`);
             const tileCenter = startCoord + i * tileSize;
@@ -245,8 +307,10 @@ export class MapBase {
                 const lintelY = wallH - lintelH / 2;
                 if (isHorizontal) {
                     addVisibleBox(tileCenter, lintelY, wallZ, doorWidth, lintelH, wallT);
+                    spawnInteractiveDoor(tileCenter, 0, wallZ, 0);
                 } else {
                     addVisibleBox(wallX, lintelY, tileCenter, wallT, lintelH, doorWidth);
+                    spawnInteractiveDoor(wallX, 0, tileCenter, Math.PI / 2);
                 }
             } else {
                 if (isHorizontal) {
