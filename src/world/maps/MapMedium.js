@@ -3,42 +3,45 @@ import { MapBase } from './MapBase.js';
 
 export class MapMedium extends MapBase {
     load() {
-        console.log("Loading Hospital Map Medium...");
+        console.log('[MapMedium] Loading Variable-Geometry Map...');
 
-        // Griglia 3x2 di stanze per garantire multipli percorsi
-        // R00 (0,0) Start
-        this.buildHospitalRoom(0, 0, 3, 3, ['E_1', 'S_1']);
+        // 18 zones: Massive Halls + Long claustrophobic hallways + Junctions
         
-        // R10 (12,0)
-        this.buildHospitalRoom(12, 0, 3, 3, ['W_1', 'E_1', 'S_1']);
-        
-        // R20 (24,0)
-        this.buildHospitalRoom(24, 0, 3, 3, ['W_1', 'S_1']);
-        
-        // R01 (0,12)
-        this.buildHospitalRoom(0, 12, 3, 3, ['N_1', 'E_1']);
-        
-        // R11 (12,12)
-        this.buildHospitalRoom(12, 12, 3, 3, ['N_1', 'W_1', 'E_1']);
-        
-        // R21 (24,12) Goal
-        this.buildHospitalRoom(24, 12, 3, 3, ['N_1', 'W_1']);
+        // Massive Halls (4x4)
+        this.buildRoomByTiles(0, 0, 4, 4, ['E_1', 'S_2']);                              // R_A (0,0)
+        this.buildRoomByTiles(12, 0, 4, 4, ['W_1', 'S_2']);                             // R_B (12,0)
+        this.buildRoomByTiles(6, 10, 4, 4, ['N_2', 'W_1', 'E_1', 'S_0', 'S_3']);        // R_C (6,10) - 5 openings!
 
-        // Più props per rendere la mappa più viva
-        this.spawnAsset('table.fbx', new THREE.Vector3(12, 0, 12), 0, true);
-        this.spawnAsset('chair.fbx', new THREE.Vector3(10, 0, 12), Math.PI/2, true);
-        this.spawnAsset('IV_Bag.fbx', new THREE.Vector3(22, 0, 2), 0, true);
-        this.spawnAsset('cabinet_2.fbx', new THREE.Vector3(0, 0, 10), Math.PI, true);
-        this.spawnAsset('bed.fbx', new THREE.Vector3(24, 0, -2), -Math.PI/2, true);
-        this.spawnAsset('wheel_chair.fbx', new THREE.Vector3(14, 0, 2), Math.PI/3, true);
+        // Junctions (1x1 Closets)
+        this.buildRoomByTiles(8, 1, 1, 1, ['W_0', 'E_0', 'S_0']);                       // J_1 (8,1)
+        this.buildRoomByTiles(2, 11, 1, 1, ['N_0', 'E_0']);                             // J_2 (2,11)
+        this.buildRoomByTiles(14, 11, 1, 1, ['N_0', 'W_0']);                            // J_3 (14,11)
+        this.buildRoomByTiles(6, 16, 1, 1, ['N_0', 'E_0']);                             // J_4 (6,16)
+        this.buildRoomByTiles(9, 16, 1, 1, ['N_0', 'W_0']);                             // J_5 (9,16)
 
-        // Uscita
-        this.spawnAsset('Exit_sign.fbx', new THREE.Vector3(24, 3, 6.2), 0, true); 
+        // Long Interlocking Hallways
+        this.buildRoomByTiles(4, 1, 4, 1, ['W_0', 'E_0']);                              // H1_left (4,1)
+        this.buildRoomByTiles(9, 1, 3, 1, ['W_0', 'E_0']);                              // H1_right (9,1)
+        this.buildRoomByTiles(8, 2, 1, 8, ['N_0', 'S_0']);                              // H2_down (8,2) - 8 tiles long!
 
-        // Start & Trigger
-        this.monsterSpawn = new THREE.Vector3(0, 1.5, 0);
-        this.addTrigger(24, 2, 12, "GOAL_REACHED");
+        this.buildRoomByTiles(2, 4, 1, 7, ['N_0', 'S_0']);                              // H3_vert (2,4) - 7 tiles long!
+        this.buildRoomByTiles(3, 11, 3, 1, ['W_0', 'E_0']);                             // H3_horiz (3,11)
 
-        document.dispatchEvent(new Event('assetsLoadedEvent'));
+        this.buildRoomByTiles(14, 4, 1, 7, ['N_0', 'S_0']);                             // H4_vert (14,4) - 7 tiles long!
+        this.buildRoomByTiles(10, 11, 4, 1, ['W_0', 'E_0']);                            // H4_horiz (10,11)
+
+        this.buildRoomByTiles(6, 14, 1, 2, ['N_0', 'S_0']);                             // H_C_down1 (6,14)
+        this.buildRoomByTiles(9, 14, 1, 2, ['N_0', 'S_0']);                             // H_C_down2 (9,14)
+        this.buildRoomByTiles(7, 16, 2, 1, ['W_0', 'E_0']);                             // H_back (7,16)
+
+        // Player spawns in Room A, aligned with the E_1 exit and looking East
+        this.playerSpawn = new THREE.Vector3(6, 1.8, 4);
+        this.playerSpawnRotationY = -Math.PI / 2;
+
+        // Monster spawns far away in Room C
+        this.monsterSpawn = new THREE.Vector3(30, 1.5, 46);
+
+        // Goal is in Room B
+        this.addTrigger(54, 2, 6, 'GOAL_REACHED');
     }
 }

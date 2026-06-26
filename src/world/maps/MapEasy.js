@@ -3,40 +3,33 @@ import { MapBase } from './MapBase.js';
 
 export class MapEasy extends MapBase {
     load() {
-        console.log("Loading Hospital Map Easy...");
+        console.log('[MapEasy] Loading Variable-Geometry Map...');
 
-        // Room 1 (Start) - Alto Sinistra (Nord-Ovest)
-        // Connette a Est e a Sud
-        this.buildHospitalRoom(0, 0, 3, 3, ['E_1', 'S_1']);
+        // 11 zones: Irregular Big Rooms + Connecting Hallways
         
-        // Room 2 - Alto Destra (Nord-Est)
-        // Connette a Ovest (verso R1) e a Sud (verso R3)
-        this.buildHospitalRoom(12, 0, 3, 3, ['W_1', 'S_1']);
-        
-        // Room 3 (Goal) - Basso Destra (Sud-Est)
-        // Connette a Nord (verso R2) e a Ovest (verso R4)
-        this.buildHospitalRoom(12, 12, 3, 3, ['N_1', 'W_1']);
-        
-        // Room 4 - Basso Sinistra (Sud-Ovest)
-        // Connette a Nord (verso R1) e a Est (verso R3)
-        this.buildHospitalRoom(0, 12, 3, 3, ['N_1', 'E_1']);
+        // Rooms
+        this.buildRoomByTiles(0, 0, 4, 3, ['E_1', 'S_1']);         // Room A: 4x3
+        this.buildRoomByTiles(6, 0, 4, 4, ['W_1', 'S_0', 'S_2']);  // Room B: 4x4 (3 openings)
+        this.buildRoomByTiles(4, 5, 3, 3, ['N_2', 'W_1', 'E_2']);  // Room C: 3x3 (3 openings)
+        this.buildRoomByTiles(0, 6, 3, 3, ['N_1', 'E_0']);         // Room D: 3x3
+        this.buildRoomByTiles(8, 6, 2, 3, ['W_1', 'N_0']);         // Room E: 2x3
 
-        // Aggiungiamo le porte (le porte si aprono interagendo, usiamo prop o le lasciamo aperte per ora)
-        // Inseriamo un paio di props sparsi
-        this.spawnAsset('bed.fbx', new THREE.Vector3(-2, 0, -2), 0, true);
-        this.spawnAsset('wheel_chair.fbx', new THREE.Vector3(2, 0, 2), Math.PI / 4, true);
-        this.spawnAsset('cabinet_1.fbx', new THREE.Vector3(14, 0, -2), -Math.PI / 2, true);
-        
-        // Inseriamo l'Exit Sign sopra la porta della Goal Room
-        this.spawnAsset('Exit_sign.fbx', new THREE.Vector3(12, 3, 6.2), 0, true); // Sopra l'ingresso N della R3
+        // Connecting Hallways
+        this.buildRoomByTiles(4, 1, 2, 1, ['W_0', 'E_0']);         // H1: connects A and B
+        this.buildRoomByTiles(1, 3, 1, 3, ['N_0', 'S_0']);         // H2: connects A and D
+        this.buildRoomByTiles(6, 4, 1, 1, ['N_0', 'S_0']);         // H3: connects B and C
+        this.buildRoomByTiles(3, 6, 1, 1, ['W_0', 'E_0']);         // H4: connects D and C
+        this.buildRoomByTiles(7, 7, 1, 1, ['W_0', 'E_0']);         // H5: connects C and E
+        this.buildRoomByTiles(8, 4, 1, 2, ['N_0', 'S_0']);         // H6: connects B and E
 
-        // Impostiamo lo spawn del giocatore (Centro della R1)
-        this.monsterSpawn = new THREE.Vector3(0, 1.5, 0);
+        // Player spawns in Room C, looking West towards the W_1 exit
+        this.playerSpawn = new THREE.Vector3(20, 1.8, 24);
+        this.playerSpawnRotationY = Math.PI / 2;
 
-        // Impostiamo il trigger per la vittoria nella Room 3
-        this.addTrigger(12, 2, 12, "GOAL_REACHED");
+        // Monster spawns far away in Room B
+        this.monsterSpawn = new THREE.Vector3(30, 1.5, 6);
 
-        // Finta promessa o evento, in questo caso l'AssetManager ha già caricato tutto prima di chiamare load()
-        document.dispatchEvent(new Event('assetsLoadedEvent'));
+        // Goal is in Room A
+        this.addTrigger(6, 2, 4, 'GOAL_REACHED');
     }
 }

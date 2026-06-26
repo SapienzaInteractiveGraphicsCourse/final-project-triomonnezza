@@ -41,7 +41,7 @@ export class MapHospitalTest extends MapBase {
         const zPos = -10; // Riga singola un po' più vicina
 
         const loadAsset = (filename) => {
-            this.loader.load('assets/models/hospital_test/' + filename, (fbx) => {
+            this.loader.load('assets/models/hospital_test/' + filename, async (fbx) => {
                 const model = fbx;
                 model.position.set(xPos, 0, zPos);
                 
@@ -61,21 +61,25 @@ export class MapHospitalTest extends MapBase {
                 
                 if (mapping) {
                     const basePath = 'assets/models/hospital_test/textures/' + mapping.prefix;
-                    const map = this.getTexture(basePath + mapping.base + '.png');
-                    map.colorSpace = THREE.SRGBColorSpace;
-                    
-                    const normalMap = this.getTexture(basePath + 'Normal.png');
-                    const roughnessMap = this.getTexture(basePath + 'Roughness.png');
-                    const metallicMap = this.getTexture(basePath + 'Metallic.png');
-                    
-                    customMat = new THREE.MeshStandardMaterial({
-                        map: map,
-                        normalMap: normalMap,
-                        roughnessMap: roughnessMap,
-                        metalnessMap: metallicMap,
-                        roughness: 1.0,
-                        metalness: 1.0,
-                    });
+                    try {
+                        const map = await this.textureLoader.loadAsync(basePath + mapping.base + '.png');
+                        map.colorSpace = THREE.SRGBColorSpace;
+                        
+                        const normalMap = await this.textureLoader.loadAsync(basePath + 'Normal.png').catch(()=>null);
+                        const roughnessMap = await this.textureLoader.loadAsync(basePath + 'Roughness.png').catch(()=>null);
+                        const metallicMap = await this.textureLoader.loadAsync(basePath + 'Metallic.png').catch(()=>null);
+                        
+                        customMat = new THREE.MeshStandardMaterial({
+                            map: map,
+                            normalMap: normalMap,
+                            roughnessMap: roughnessMap,
+                            metalnessMap: metallicMap,
+                            roughness: 1.0,
+                            metalness: 1.0,
+                        });
+                    } catch (e) {
+                        console.error("Errore texture", e);
+                    }
                 }
                 
                 model.traverse((child) => {

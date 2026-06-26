@@ -13,8 +13,8 @@ export class PlayerController {
 
         // 1. Setup Controlli Cinematici (Pointer Lock)
         this.controls = new PointerLockControls(this.camera, this.domElement);
-        // Ripristina l'altezza della telecamera perché PointerLockControls la resetta a y=0
-        this.camera.position.set(0, 1.8, 0);
+        // Assicurati che l'altezza sia 1.8 senza sovrascrivere X e Z dello spawn
+        this.camera.position.y = 1.8;
         
         // 2. Vettori di Stato del Giocatore e Parametri di Movimento
         this.velocity = new THREE.Vector3();

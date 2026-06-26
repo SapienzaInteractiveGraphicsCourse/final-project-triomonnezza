@@ -7,6 +7,7 @@ class HospitalAssetManagerClass {
     constructor() {
         this.models = {};
         this.materials = {};
+        this.materialPromises = {};
         this.loader = new FBXLoader();
         this.textureLoader = new THREE.TextureLoader();
         this.isLoaded = false;
@@ -23,6 +24,12 @@ class HospitalAssetManagerClass {
         const total = hospitalAssets.length;
         
         return new Promise((resolve, reject) => {
+            if (total === 0) {
+                this.isLoaded = true;
+                resolve();
+                return;
+            }
+
             const checkDone = () => {
                 loadedCount++;
                 document.dispatchEvent(new CustomEvent('assetProgressEvent', { detail: { progress: (loadedCount / total) * 100 } }));
@@ -34,7 +41,7 @@ class HospitalAssetManagerClass {
             };
 
             hospitalAssets.forEach(filename => {
-                this.loader.load('assets/models/hospital_test/' + filename, (fbx) => {
+                this.loader.load('assets/models/hospital_test/' + filename, async (fbx) => {
                     const model = fbx;
                     
                     // Applica lo scale 0.01 per convertire da cm a metri
@@ -51,24 +58,35 @@ class HospitalAssetManagerClass {
                         // Creiamo un identificativo univoco per il materiale per evitare di duplicarlo in memoria
                         const matId = mapping.prefix;
                         
-                        if (!this.materials[matId]) {
-                            const map = this.textureLoader.load(basePath + mapping.base + '.png');
-                            map.colorSpace = THREE.SRGBColorSpace;
-                            
-                            const normalMap = this.textureLoader.load(basePath + 'Normal.png');
-                            const roughnessMap = this.textureLoader.load(basePath + 'Roughness.png');
-                            const metallicMap = this.textureLoader.load(basePath + 'Metallic.png');
-                            
-                            this.materials[matId] = new THREE.MeshStandardMaterial({
-                                map: map,
-                                normalMap: normalMap,
-                                roughnessMap: roughnessMap,
-                                metalnessMap: metallicMap,
-                                roughness: 1.0,
-                                metalness: 1.0,
-                            });
+                        if (!this.materialPromises[matId]) {
+                            this.materialPromises[matId] = (async () => {
+                                try {
+                                    const map = await this.textureLoader.loadAsync(basePath + mapping.base + '.png');
+                                    map.colorSpace = THREE.SRGBColorSpace;
+                                    map.anisotropy  = 4;
+
+                                    const normalMap    = await this.textureLoader.loadAsync(basePath + 'Normal.png').catch(() => null);
+                                    const roughnessMap = await this.textureLoader.loadAsync(basePath + 'Roughness.png').catch(() => null);
+                                    const metallicMap  = await this.textureLoader.loadAsync(basePath + 'Metallic.png').catch(() => null);
+
+                                    const material = new THREE.MeshStandardMaterial({
+                                        map:          map,
+                                        normalMap:    normalMap,
+                                        roughnessMap: roughnessMap,
+                                        metalnessMap: metallicMap,
+                                        roughness:    0.65,  // era 1.0 → troppo opaco
+                                        metalness:    0.05,  // era 1.0 → quasi nero senza envMap!
+                                        envMapIntensity: 0,
+                                    });
+                                    this.materials[matId] = material;
+                                    return material;
+                                } catch (e) {
+                                    console.error("Errore caricamento texture per", matId, e);
+                                    return null;
+                                }
+                            })();
                         }
-                        customMat = this.materials[matId];
+                        customMat = await this.materialPromises[matId];
                     }
                     
                     model.traverse((child) => {

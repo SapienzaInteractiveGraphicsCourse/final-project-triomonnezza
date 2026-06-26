@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { InteriorAssetManager } from '../InteriorAssetManager.js';
 import { HospitalAssetManager } from '../HospitalAssetManager.js';
 
 export class MapBase {
@@ -7,118 +8,258 @@ export class MapBase {
         this.scene = scene;
         this.collisionBoxes = [];
         this.triggerZones = [];
-        this.monsterSpawn = new THREE.Vector3(0, 1.5, 0); // Default spawn
+        this.playerSpawn = new THREE.Vector3(0, 1.8, 0);
+        this.playerSpawnRotationY = 0;
+        this.monsterSpawn = new THREE.Vector3(0, 1.5, 0);
         this.flickeringLights = [];
     }
 
-    spawnAsset(filename, position, rotationY = 0, isProp = false) {
-        const mesh = HospitalAssetManager.get(filename);
+    spawnAsset(filename, position, rotationY = 0) {
+        const isGlb = filename.endsWith('.glb');
+        const mesh = isGlb
+            ? InteriorAssetManager.get(filename)
+            : HospitalAssetManager.get(filename);
         if (!mesh) return null;
-        
+
         mesh.position.copy(position);
         mesh.rotation.set(0, rotationY, 0);
-        
         this.scene.add(mesh);
-        
-        // Luci personalizzate per gli oggetti speciali
+
         if (filename === 'Exit_sign.fbx') {
-            const greenLight = new THREE.PointLight(0x00ff00, 10.0, 6); // Luce verde per l'insegna
+            const greenLight = new THREE.PointLight(0x00ff44, 5.0, 8);
             greenLight.position.set(0, -0.5, 0);
             mesh.add(greenLight);
         }
 
-        // Aggiungi collisione (solo se non è un prop piccolo o decorativo, altrimenti il player si incastra)
-        if (!isProp) {
-            const box = new THREE.Box3().setFromObject(mesh);
-            this.collisionBoxes.push(box);
-        } else {
-            // Per i prop, potremmo fare un box più piccolo o cilindrico, 
-            // ma per ora aggiungiamo il box di base per i grandi prop.
-            const box = new THREE.Box3().setFromObject(mesh);
-            this.collisionBoxes.push(box);
-        }
-        
+        const box = new THREE.Box3().setFromObject(mesh);
+        this.collisionBoxes.push(box);
+        return mesh;
+    }
+
+    spawnTile(filename, position, rotationY = 0) {
+        const mesh = InteriorAssetManager.get(filename);
+        if (!mesh) return null;
+        mesh.position.copy(position);
+        mesh.rotation.set(0, rotationY, 0);
+        this.scene.add(mesh);
         return mesh;
     }
 
     addInvisibleCollisionBox(x, y, z, w, h, d) {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial());
+        const geo  = new THREE.BoxGeometry(w, h, d);
+        const mat  = new THREE.MeshBasicMaterial({ visible: false });
+        const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(x, y, z);
         mesh.updateMatrixWorld(true);
         this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
     }
 
-    // Costruttore modulare per stanze ospedaliere
-    // grid = 4 metri. cx, cz = centro logico in metri.
-    buildHospitalRoom(cx, cz, cols, rows, doorways = [], hasCeiling = true) {
-        const tileSize = 4; // Supponiamo 4 metri
+    buildHospitalRoom(cx, cz, cols, rows, doorways = [], options = {}) {
+        const {
+            hasCeiling = true,
+            floorTile = 'floorTiles.glb',
+            ceilingTile = 'ceilingPlaster.glb',
+            wallTile = 'wallPlaster.glb',
+            wallDoorTile = 'wallDoorPlaster.glb',
+            ceilingHeight = 4,
+            wallScaleY = 1,
+            wallOffsetY = 0
+        } = options;
+        const tileSize = 4;
         const startX = cx - (cols * tileSize) / 2 + tileSize / 2;
         const startZ = cz - (rows * tileSize) / 2 + tileSize / 2;
+
+        let lightsPlaced = 0;
+        const maxLights = Math.max(1, Math.floor((cols * rows) / 4));
+
+        const scaleWall = (mesh) => {
+            if (mesh) {
+                if (wallScaleY !== 1) mesh.scale.set(1, wallScaleY, 1);
+                if (wallOffsetY !== 0) mesh.position.y += wallOffsetY;
+            }
+        };
 
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const x = startX + c * tileSize;
                 const z = startZ + r * tileSize;
 
-                // Pavimento e soffitto
-                this.spawnAsset('floor_tile_1.fbx', new THREE.Vector3(x, 0, z));
+                this.spawnTile(floorTile, new THREE.Vector3(x, 0, z));
+
                 if (hasCeiling) {
-                    this.spawnAsset('ceiling_tile.fbx', new THREE.Vector3(x, 4, z));
-                    
-                    // Solo in alcune stanze o posizioni mettiamo la lampada per tenere buio
-                    if (Math.random() > 0.4) {
-                        this.spawnAsset('ceiling_light.fbx', new THREE.Vector3(x, 4, z));
-                        const light = new THREE.PointLight(0xddddff, 0.15, 8); // Luce molto debole (0.15)
-                        light.position.set(x, 3.8, z);
+                    this.spawnTile(ceilingTile, new THREE.Vector3(x, ceilingHeight, z));
+
+                    if (lightsPlaced < maxLights && Math.random() > 0.4) {
+                        this.spawnTile('ceilingLight.glb', new THREE.Vector3(x, ceilingHeight, z));
+                        const light = new THREE.PointLight(0xddeeff, 1.5, 14);
+                        light.position.set(x, ceilingHeight - 0.5, z);
                         this.scene.add(light);
-                        
-                        // Registra per sfarfallio
                         this.flickeringLights.push({
-                            light: light,
-                            timer: Math.random() * 5.0,
-                            isFlickering: false,
-                            baseIntensity: 0.15
+                            light, timer: Math.random() * 5.0,
+                            isFlickering: false, baseIntensity: 1.5
                         });
+                        lightsPlaced++;
                     }
                 }
 
-                // Muri esterni
-                const isNorthEdge = (r === 0);
-                const isSouthEdge = (r === rows - 1);
-                const isWestEdge = (c === 0);
-                const isEastEdge = (c === cols - 1);
+                const isN = r === 0, isS = r === rows - 1;
+                const isW = c === 0, isE = c === cols - 1;
 
-                if (isNorthEdge) {
-                    if (doorways.includes(`N_${c}`)) this.spawnAsset('tile_doorway_1.fbx', new THREE.Vector3(x, 0, z - tileSize/2), 0);
-                    else this.spawnAsset('tile_wall.fbx', new THREE.Vector3(x, 0, z - tileSize/2), 0);
+                if (isN) {
+                    const t = doorways.includes(`N_${c}`) ? wallDoorTile : wallTile;
+                    scaleWall(this.spawnTile(t, new THREE.Vector3(x, 0, z - tileSize / 2), 0));
                 }
-                if (isSouthEdge) {
-                    if (doorways.includes(`S_${c}`)) this.spawnAsset('tile_doorway_1.fbx', new THREE.Vector3(x, 0, z + tileSize/2), Math.PI);
-                    else this.spawnAsset('tile_wall.fbx', new THREE.Vector3(x, 0, z + tileSize/2), Math.PI);
+                if (isS) {
+                    const t = doorways.includes(`S_${c}`) ? wallDoorTile : wallTile;
+                    scaleWall(this.spawnTile(t, new THREE.Vector3(x, 0, z + tileSize / 2), Math.PI));
                 }
-                if (isWestEdge) {
-                    if (doorways.includes(`W_${r}`)) this.spawnAsset('tile_doorway_1.fbx', new THREE.Vector3(x - tileSize/2, 0, z), -Math.PI/2);
-                    else this.spawnAsset('tile_wall.fbx', new THREE.Vector3(x - tileSize/2, 0, z), -Math.PI/2);
+                if (isW) {
+                    const t = doorways.includes(`W_${r}`) ? wallDoorTile : wallTile;
+                    scaleWall(this.spawnTile(t, new THREE.Vector3(x - tileSize / 2, 0, z), -Math.PI / 2));
                 }
-                if (isEastEdge) {
-                    if (doorways.includes(`E_${r}`)) this.spawnAsset('tile_doorway_1.fbx', new THREE.Vector3(x + tileSize/2, 0, z), Math.PI/2);
-                    else this.spawnAsset('tile_wall.fbx', new THREE.Vector3(x + tileSize/2, 0, z), Math.PI/2);
+                if (isE) {
+                    const t = doorways.includes(`E_${r}`) ? wallDoorTile : wallTile;
+                    scaleWall(this.spawnTile(t, new THREE.Vector3(x + tileSize / 2, 0, z), Math.PI / 2));
                 }
             }
         }
-        
-        // Aggiungi un grosso box di collisione per i muri esterni per evitare glitch attraverso i bordi
-        const width = cols * tileSize;
-        const depth = rows * tileSize;
-        const t = 1; // Spessore muro logico
-        this.addInvisibleCollisionBox(cx, 2, cz - depth/2, width, 4, t); // Nord
-        this.addInvisibleCollisionBox(cx, 2, cz + depth/2, width, 4, t); // Sud
-        this.addInvisibleCollisionBox(cx - width/2, 2, cz, t, 4, depth); // Ovest
-        this.addInvisibleCollisionBox(cx + width/2, 2, cz, t, 4, depth); // Est
+
+        const halfW = (cols * tileSize) / 2;
+        const halfD = (rows * tileSize) / 2;
+
+        this._buildWallWithGaps(cx, cz - halfD, true,  doorways, 'N', cols, startX, tileSize);
+        this._buildWallWithGaps(cx, cz + halfD, true,  doorways, 'S', cols, startX, tileSize);
+        this._buildWallWithGaps(cx - halfW, cz, false, doorways, 'W', rows, startZ, tileSize);
+        this._buildWallWithGaps(cx + halfW, cz, false, doorways, 'E', rows, startZ, tileSize);
+    }
+
+    _buildWallWithGaps(wallX, wallZ, isHorizontal, doorways, side, count, startCoord, tileSize) {
+        const doorWidth = 2.4;
+        const wallH = 4.5;
+        const wallT = 0.5;
+
+        for (let i = 0; i < count; i++) {
+            const hasDoor    = doorways.includes(`${side}_${i}`);
+            const tileCenter = startCoord + i * tileSize;
+
+            if (hasDoor) {
+                const sideLen = (tileSize - doorWidth) / 2;
+                if (sideLen > 0.05) {
+                    const offset = tileSize / 2 - sideLen / 2;
+                    if (isHorizontal) {
+                        this.addInvisibleCollisionBox(tileCenter - offset, wallH / 2, wallZ, sideLen, wallH, wallT);
+                        this.addInvisibleCollisionBox(tileCenter + offset, wallH / 2, wallZ, sideLen, wallH, wallT);
+                    } else {
+                        this.addInvisibleCollisionBox(wallX, wallH / 2, tileCenter - offset, wallT, wallH, sideLen);
+                        this.addInvisibleCollisionBox(wallX, wallH / 2, tileCenter + offset, wallT, wallH, sideLen);
+                    }
+                }
+            } else {
+                if (isHorizontal) {
+                    this.addInvisibleCollisionBox(tileCenter, wallH / 2, wallZ, tileSize, wallH, wallT);
+                } else {
+                    this.addInvisibleCollisionBox(wallX, wallH / 2, tileCenter, wallT, wallH, tileSize);
+                }
+            }
+        }
+    }
+
+    buildRoomByTiles(tx, tz, cols, rows, doorways = []) {
+        // Tile size is 4m. Center of tile (0,0) is at x=0, z=0.
+        // Left edge of tile 0 is x=-2. Right edge is x=2.
+        // A room of size (cols, rows) starting at tile (tx, tz) has:
+        // Left edge: tx * 4 - 2
+        // Right edge: (tx + cols) * 4 - 2
+        // Center X: tx * 4 - 2 + (cols * 4) / 2 = tx * 4 + cols * 2 - 2
+        const cx = tx * 4 + cols * 2 - 2;
+        const cz = tz * 4 + rows * 2 - 2;
+        this.buildBlockRoom(cx, cz, cols, rows, doorways);
+    }
+
+    buildBlockRoom(cx, cz, cols, rows, doorways = []) {
+        const tileSize = 4;
+        const w = cols * tileSize;
+        const d = rows * tileSize;
+        const wallH = 4.5;
+        const wallT = 0.5;
+        const doorWidth = 2.4;
+
+        const floorGeo = new THREE.BoxGeometry(w, 0.5, d);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.position.set(cx, -0.25, cz);
+        floor.receiveShadow = true;
+        this.scene.add(floor);
+
+        const ceilGeo = new THREE.BoxGeometry(w, 0.5, d);
+        const ceilMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+        const ceil = new THREE.Mesh(ceilGeo, ceilMat);
+        ceil.position.set(cx, wallH + 0.25, cz);
+        this.scene.add(ceil);
+
+        const startX = cx - w/2 + tileSize/2;
+        const startZ = cz - d/2 + tileSize/2;
+
+        this._buildVisibleWallWithGaps(cx, cz - d/2, true, doorways, 'N', cols, startX, tileSize, wallH, wallT, doorWidth);
+        this._buildVisibleWallWithGaps(cx, cz + d/2, true, doorways, 'S', cols, startX, tileSize, wallH, wallT, doorWidth);
+        this._buildVisibleWallWithGaps(cx - w/2, cz, false, doorways, 'W', rows, startZ, tileSize, wallH, wallT, doorWidth);
+        this._buildVisibleWallWithGaps(cx + w/2, cz, false, doorways, 'E', rows, startZ, tileSize, wallH, wallT, doorWidth);
+
+        const light = new THREE.PointLight(0xffeedd, 1.0, 15);
+        light.position.set(cx, wallH - 0.5, cz);
+        this.scene.add(light);
+    }
+
+    _buildVisibleWallWithGaps(wallX, wallZ, isHorizontal, doorways, side, count, startCoord, tileSize, wallH, wallT, doorWidth) {
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0xa0a0a0 });
+
+        const addVisibleBox = (x, y, z, w, h, d) => {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geo, wallMat);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.updateMatrixWorld(true);
+            this.scene.add(mesh);
+            this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
+        };
+
+        for (let i = 0; i < count; i++) {
+            const hasDoor    = doorways.includes(`${side}_${i}`);
+            const tileCenter = startCoord + i * tileSize;
+
+            if (hasDoor) {
+                const sideLen = (tileSize - doorWidth) / 2;
+                if (sideLen > 0.05) {
+                    const offset = tileSize / 2 - sideLen / 2;
+                    if (isHorizontal) {
+                        addVisibleBox(tileCenter - offset, wallH / 2, wallZ, sideLen, wallH, wallT);
+                        addVisibleBox(tileCenter + offset, wallH / 2, wallZ, sideLen, wallH, wallT);
+                    } else {
+                        addVisibleBox(wallX, wallH / 2, tileCenter - offset, wallT, wallH, sideLen);
+                        addVisibleBox(wallX, wallH / 2, tileCenter + offset, wallT, wallH, sideLen);
+                    }
+                }
+                const lintelH = 1.5; 
+                const lintelY = wallH - lintelH / 2;
+                if (isHorizontal) {
+                    addVisibleBox(tileCenter, lintelY, wallZ, doorWidth, lintelH, wallT);
+                } else {
+                    addVisibleBox(wallX, lintelY, tileCenter, wallT, lintelH, doorWidth);
+                }
+            } else {
+                if (isHorizontal) {
+                    addVisibleBox(tileCenter, wallH / 2, wallZ, tileSize, wallH, wallT);
+                } else {
+                    addVisibleBox(wallX, wallH / 2, tileCenter, wallT, wallH, tileSize);
+                }
+            }
+        }
     }
 
     addTrigger(x, y, z, name) {
-        const triggerMesh = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.2 }));
+        const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.0 });
+        const triggerMesh = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), mat);
         triggerMesh.position.set(x, y, z);
         this.scene.add(triggerMesh);
         this.triggerZones.push({
@@ -129,37 +270,29 @@ export class MapBase {
     }
 
     update(deltaTime) {
-        if (this.flickeringLights) {
-            for (let i = 0; i < this.flickeringLights.length; i++) {
-                const obj = this.flickeringLights[i];
-                obj.timer -= deltaTime;
-                if (obj.isFlickering) {
-                    // Durante lo sfarfallio, accendi o spegni casualmente
-                    obj.light.intensity = Math.random() > 0.5 ? obj.baseIntensity : 0;
-                    if (obj.timer <= 0) {
-                        obj.isFlickering = false;
-                        obj.light.intensity = obj.baseIntensity;
-                        obj.timer = 5.0 + Math.random() * 15.0; // Rimani acceso a lungo
-                    }
-                } else {
-                    if (obj.timer <= 0) {
-                        obj.isFlickering = true;
-                        obj.timer = 0.5 + Math.random() * 1.5; // Sfarfalla per un po'
-                    }
+        for (const obj of this.flickeringLights) {
+            obj.timer -= deltaTime;
+            if (obj.isFlickering) {
+                obj.light.intensity = Math.random() > 0.5 ? obj.baseIntensity : 0;
+                if (obj.timer <= 0) {
+                    obj.isFlickering = false;
+                    obj.light.intensity = obj.baseIntensity;
+                    obj.timer = 6.0 + Math.random() * 12.0;
+                }
+            } else {
+                if (obj.timer <= 0) {
+                    obj.isFlickering = true;
+                    obj.timer = 0.3 + Math.random() * 1.0;
                 }
             }
         }
     }
 
-    load() {
-        // Da implementare nelle classi figlie
-    }
+    load() {}
 
-    getCollisionBoxes() {
-        return this.collisionBoxes;
-    }
-
-    getTriggerZones() {
-        return this.triggerZones;
-    }
+    getCollisionBoxes() { return this.collisionBoxes; }
+    getTriggerZones()   { return this.triggerZones; }
+    getPlayerSpawn()    { return this.playerSpawn; }
+    getPlayerRotationY(){ return this.playerSpawnRotationY; }
+    getMonsterSpawn()   { return this.monsterSpawn; }
 }

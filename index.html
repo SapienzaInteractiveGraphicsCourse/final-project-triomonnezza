@@ -254,8 +254,6 @@
             <button class="diff-btn" data-diff="easy">Map Easy</button>
             <button class="diff-btn" data-diff="medium">Map Medium</button>
             <button class="diff-btn" data-diff="hard">Map Hard</button>
-            <button class="diff-btn test-btn" data-diff="test" style="color: #ffaa00; border-color: #ffaa00;">Test Assets Map</button>
-            <button class="diff-btn test-btn" data-diff="hospital_test" style="color: #00aaff; border-color: #00aaff; margin-top: 20px;">Test Hospital FBX</button>
       </div>
     </div>
 
@@ -290,18 +288,18 @@
     <script type="module" src="main.js"></script>
 
     <script>
-        const instructions = document.getElementById('instructions');
-        const crosshair = document.getElementById('crosshair');
-        const hudMessages = document.getElementById('hud-messages');
-        const staminaBar = document.getElementById('stamina-bar');
-        
-        const mainMenu = document.getElementById('main-menu');
-        const loadingScreen = document.getElementById('loading-screen');
-        const loadingBarFill = document.getElementById('loading-bar-fill');
-        const loadingText = document.getElementById('loading-text');
-        
+        const instructions    = document.getElementById('instructions');
+        const crosshair       = document.getElementById('crosshair');
+        const hudMessages     = document.getElementById('hud-messages');
+        const staminaBar      = document.getElementById('stamina-bar');
+        const mainMenu        = document.getElementById('main-menu');
+        const loadingScreen   = document.getElementById('loading-screen');
+        const loadingBarFill  = document.getElementById('loading-bar-fill');
+        const loadingText     = document.getElementById('loading-text');
+        const fadeOverlay     = document.getElementById('fade-overlay');
+
         let msgTimeout;
-        let gameStarted = false;
+        let phraseInterval;
 
         const loadingPhrases = [
             "Hiding keys...",
@@ -312,86 +310,75 @@
             "Preparing jumpscares..."
         ];
 
-        const fadeOverlay = document.getElementById('fade-overlay');
-
-        // Gestione Menu Principale
+        // ── Bottoni del menu ────────────────────────────────────────
         document.querySelectorAll('.diff-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const diff = e.target.getAttribute('data-diff');
-                
+                const diff = e.currentTarget.getAttribute('data-diff');
+
+                // Mostra loading, nascondi menu
                 mainMenu.style.display = 'none';
                 loadingScreen.style.display = 'flex';
-                
-                // Inizializza la barra a 0 (verrà aggiornata dinamicamente)
-                loadingBarFill.style.transition = 'width 0.1s linear';
                 loadingBarFill.style.width = '0%';
-                
-                // Avvia il caricamento lato game logic
+
+                // Cicla frasi di caricamento
+                let phraseIndex = 0;
+                loadingText.innerText = loadingPhrases[0];
+                clearInterval(phraseInterval);
+                phraseInterval = setInterval(() => {
+                    phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
+                    loadingText.innerText = loadingPhrases[phraseIndex];
+                }, 1800);
+
+                // Avvia il gioco
                 try {
                     document.dispatchEvent(new CustomEvent('startGameEvent', { detail: { difficulty: diff } }));
                 } catch (err) {
-                    document.getElementById('error-log').innerText += '\nError during game start: ' + err.message;
+                    document.getElementById('error-log').innerText += '\nError: ' + err.message;
                     console.error(err);
                 }
             });
         });
 
-        // Aggiorna la barra di caricamento reale in base all'evento
+        // ── Aggiorna barra di caricamento ───────────────────────────
         document.addEventListener('assetProgressEvent', (e) => {
-            if (!gameStarted) {
-                loadingBarFill.style.width = e.detail.progress + '%';
-            }
+            loadingBarFill.style.width = e.detail.progress + '%';
         });
 
-        // Quando il motore finisce di caricare, sblocca la UI
+        // ── Tutto caricato → mostra istruzioni ──────────────────────
+        let gameStarted = false;
         document.addEventListener('assetsLoadedEvent', () => {
+            clearInterval(phraseInterval);
             loadingScreen.style.display = 'none';
-            instructions.style.display = 'flex';
+            instructions.style.display  = 'flex';
             gameStarted = true;
         });
 
-        // Nascondi/Mostra la schermata iniziale in base al PointerLock
+        // ── PointerLock: nascondi/mostra istruzioni ─────────────────
         document.addEventListener('pointerlockchange', () => {
-            if (!gameStarted) return; // Ignora se il gioco non è ancora iniziato
-
-            if (document.pointerLockElement === document.body || document.pointerLockElement?.tagName === 'CANVAS') {
-                instructions.style.display = 'none';
-            } else {
-                instructions.style.display = 'flex';
-            }
+            if (!gameStarted) return;
+            const locked = document.pointerLockElement === document.body
+                        || document.pointerLockElement?.tagName === 'CANVAS';
+            instructions.style.display = locked ? 'none' : 'flex';
         });
 
-        // Ascolta l'evento di cambio stamina inviato dal PlayerController
+        // ── HUD Stamina ─────────────────────────────────────────────
         document.addEventListener('staminaChanged', (e) => {
-            const percentuale = e.detail.percentuale;
-            staminaBar.style.width = percentuale + '%';
-            
-            // Feedback visivo se la stamina è esaurita
-            if (percentuale <= 0) {
-                staminaBar.style.backgroundColor = '#ff3333';
-            } else {
-                staminaBar.style.backgroundColor = '#00ffaa';
-            }
+            const pct = e.detail.percentuale;
+            staminaBar.style.width           = pct + '%';
+            staminaBar.style.backgroundColor = pct <= 0 ? '#ff3333' : '#00ffaa';
         });
 
-        // 1. Cambia lo stato del mirino se stai guardando un oggetto interattivo
+        // ── Mirino ──────────────────────────────────────────────────
         document.addEventListener('uiTargetChanged', (e) => {
-            if (e.detail.name) {
-                crosshair.classList.add('active');
-            } else {
-                crosshair.classList.remove('active');
-            }
+            crosshair.classList.toggle('active', !!e.detail.name);
         });
 
-        // 2. Mostra un feedback testuale a schermo quando la porta è bloccata
+        // ── Messaggi HUD ────────────────────────────────────────────
         document.addEventListener('logMessaggioUI', (e) => {
-            hudMessages.innerText = e.detail.testo;
-            hudMessages.style.display = 'block';
-            
+            hudMessages.innerText      = e.detail.testo;
+            hudMessages.style.display  = 'block';
             clearTimeout(msgTimeout);
-            msgTimeout = setTimeout(() => {
-                hudMessages.style.display = 'none';
-            }, 3000);
+            msgTimeout = setTimeout(() => { hudMessages.style.display = 'none'; }, 3000);
         });
     </script>
 </body>
