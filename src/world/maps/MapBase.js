@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { InteriorAssetManager } from '../InteriorAssetManager.js';
-import { HospitalAssetManager } from '../HospitalAssetManager.js';
 
 export class MapBase {
 
@@ -14,11 +13,13 @@ export class MapBase {
         this.flickeringLights = [];
     }
 
+    getMeshFromManager(filename) {
+        if (!filename) return new THREE.Group();
+        return InteriorAssetManager.get(filename);
+    }
+
     spawnAsset(filename, position, rotationY = 0) {
-        const isGlb = filename.endsWith('.glb');
-        const mesh = isGlb
-            ? InteriorAssetManager.get(filename)
-            : HospitalAssetManager.get(filename);
+        const mesh = this.getMeshFromManager(filename);
         if (!mesh) return null;
 
         mesh.position.copy(position);

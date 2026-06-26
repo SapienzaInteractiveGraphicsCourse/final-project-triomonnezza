@@ -4,7 +4,6 @@ import { Monster } from './src/entities/Monster.js';
 import { MapEasy } from './src/world/maps/MapEasy.js';
 import { MapMedium } from './src/world/maps/MapMedium.js';
 import { MapHard } from './src/world/maps/MapHard.js';
-import { HospitalAssetManager } from './src/world/HospitalAssetManager.js';
 import { InteriorAssetManager } from './src/world/InteriorAssetManager.js';
 
 // ==========================================
@@ -51,7 +50,6 @@ document.addEventListener('startGameEvent', async (e) => {
     try {
         // Aspetta che tutti gli FBX/GLB siano caricati (con aggiornamento della loading bar)
         await Promise.all([
-            HospitalAssetManager.preloadAll(),  // props FBX (bed, chair, etc.)
             InteriorAssetManager.preloadAll(),  // geometry + props GLB
         ]);
 
