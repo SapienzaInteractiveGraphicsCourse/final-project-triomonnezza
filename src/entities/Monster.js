@@ -35,6 +35,10 @@ export class Monster {
         this._tweenGroup = new TWEEN.Group();
         this._animState = null; // 'walk' | 'idle' | null
 
+        // Raw monster height: feet bottom (~-1.5) to horn top (~+1.25) = ~2.75 units.
+        // Door height = 4.5m → scale = 4.5 / 2.75 ≈ 1.636  →  monster fills the doorway.
+        this.root.scale.set(1.636, 1.636, 1.636);
+
         this._buildHierarchy();
     }
 

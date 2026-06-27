@@ -39,7 +39,7 @@ export class MapMedium extends MapBase {
         this.playerSpawnRotationY = -Math.PI / 2;
 
         // Monster spawns far away in Room C
-        this.monsterSpawn = new THREE.Vector3(30, 1.5, 46);
+        this.monsterSpawn = new THREE.Vector3(30, 2.454, 46); // Root Y so feet rest on floor
 
         // Goal is in Room B
         this.addTrigger(54, 2, 6, 'GOAL_REACHED');

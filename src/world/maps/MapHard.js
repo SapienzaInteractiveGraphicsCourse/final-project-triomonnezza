@@ -52,7 +52,7 @@ export class MapHard extends MapBase {
         this.playerSpawnRotationY = -Math.PI / 2;
 
         // Monster spawns in Room I
-        this.monsterSpawn = new THREE.Vector3(6, 1.5, 102);
+        this.monsterSpawn = new THREE.Vector3(6, 2.454, 102); // Root Y so feet rest on floor
         
         // Goal is in Room M
         this.addTrigger(104, 2, 18, 'GOAL_REACHED');

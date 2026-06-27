@@ -7,10 +7,13 @@ export class MapBase {
         this.scene = scene;
         this.collisionBoxes = [];
         this.triggerZones = [];
-        this.playerSpawn = new THREE.Vector3(0, 1.8, 0);
+        this.playerSpawn = new THREE.Vector3(0, 1.8, 0); // Eye level height
         this.playerSpawnRotationY = 0;
-        this.monsterSpawn = new THREE.Vector3(0, 1.5, 0);
+        this.monsterSpawn = new THREE.Vector3(0, 2.454, 0); // Root Y so feet rest on floor with scale 1.636
         this.flickeringLights = [];
+        // Tracks world positions of already-spawned doors to prevent
+        // duplicate doors when two adjacent rooms both declare the same doorway.
+        this._spawnedDoorKeys = new Set();
     }
 
     getMeshFromManager(filename) {
@@ -181,7 +184,7 @@ export class MapBase {
         const tileSize = 4;
         const w = cols * tileSize;
         const d = rows * tileSize;
-        const wallH = 4.5;
+        const wallH = 5.5;  // Higher walls
         const wallT = 0.5;
         const doorWidth = 2.4;
 
@@ -228,7 +231,11 @@ export class MapBase {
         const spawnInteractiveDoor = (x, y, z, rotationY) => {
             const mesh = InteriorAssetManager.get('low_poly_psx_hinged_door.glb');
             if (!mesh) return;
-            
+
+            // ── Deduplication: skip if a door was already placed at this position ──
+            const key = `${Math.round(x * 10)},${Math.round(z * 10)}`;
+            if (this._spawnedDoorKeys.has(key)) return;
+            this._spawnedDoorKeys.add(key);
             // 1. Reset mesh to measure raw size
             mesh.position.set(0, 0, 0);
             mesh.rotation.set(0, 0, 0);
@@ -239,9 +246,9 @@ export class MapBase {
             const rawSize = new THREE.Vector3();
             rawBox.getSize(rawSize);
             
-            // 2. Calculate scaling to fit our 2.4 x 3.0 doorway
+            // 2. Calculate scaling to fit our 2.4 x 4.5 doorway
             const targetWidth = 2.4;
-            const targetHeight = 3.0;
+            const targetHeight = 4.5;
             
             const scaleX = targetWidth / (rawSize.x || 1);
             const scaleY = targetHeight / (rawSize.y || 1);
@@ -269,18 +276,25 @@ export class MapBase {
                 isInteractive: true, 
                 tipo: 'porta', 
                 isOpen: false,
+                isAnimating: false,  // locked while the swing animation runs
                 startRotationY: rotationY
             };
             
             hinge.userData = doorData;
             // The raycaster hits the mesh, so give it the same userData reference
             mesh.traverse((child) => {
-                if (child.isMesh) child.userData = doorData;
+                if (child.isMesh) {
+                    child.userData = doorData;
+                    child.parentHinge = hinge; // Crucial reference for animating the parent group
+                }
             });
             
             hinge.updateMatrixWorld(true);
             const box = new THREE.Box3().setFromObject(hinge);
             hinge.userData.collisionBox = box;
+            // Save closed-state extents so we can restore them when the door swings shut
+            hinge.userData.closedBoxMin = box.min.clone();
+            hinge.userData.closedBoxMax = box.max.clone();
             
             this.scene.add(hinge);
             this.collisionBoxes.push(box);
@@ -303,7 +317,7 @@ export class MapBase {
                         addVisibleBox(wallX, wallH / 2, tileCenter + offset, wallT, wallH, sideLen);
                     }
                 }
-                const lintelH = 1.5; 
+                const lintelH = 1.0; 
                 const lintelY = wallH - lintelH / 2;
                 if (isHorizontal) {
                     addVisibleBox(tileCenter, lintelY, wallZ, doorWidth, lintelH, wallT);

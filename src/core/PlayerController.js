@@ -13,9 +13,13 @@ export class PlayerController {
 
         // 1. Setup Controlli Cinematici (Pointer Lock)
         this.controls = new PointerLockControls(this.camera, this.domElement);
-        // Assicurati che l'altezza sia 1.8 senza sovrascrivere X e Z dello spawn
-        this.camera.position.y = 1.8;
-        
+        // Eye level: 2.5m — comfortably below the 4.5m doors
+        this.camera.position.y = 2.5;
+        // Clamp vertical look: block looking straight down (hides missing legs)
+        // 0.3 rad ≈ 17° from straight up;  Math.PI*0.72 ≈ 40° max below horizon
+        this.controls.minPolarAngle = 0.3;
+        this.controls.maxPolarAngle = Math.PI * 0.72;
+
         // 2. Vettori di Stato del Giocatore e Parametri di Movimento
         this.velocity = new THREE.Vector3();
         this.direction = new THREE.Vector3();
@@ -23,7 +27,7 @@ export class PlayerController {
         this.sprintMoveSpeed = 85.0; // Velocità raddoppiata durante lo scatto
         this.moveSpeed = this.baseMoveSpeed; 
         this.friction = 10.0;  
-        this.playerSize = new THREE.Vector3(0.8, 2.0, 0.8); // Dimensioni scatola di collisione utente
+        this.playerSize = new THREE.Vector3(1.5, 1.8, 1.5); // Collision box (centered at eye level)
 
         // --- SISTEMA DI STAMINA ---
         this.maxStamina = 4.0;       // Dura 4 secondi di corsa continua
@@ -39,7 +43,7 @@ export class PlayerController {
 
         // 4. Sensore Virtuale di Sguardo (Raycaster per Interazioni)
         this.raycaster = new THREE.Raycaster();
-        this.rayDistance = 2.5; 
+        this.rayDistance = 4.5; 
         this.interactiveObject = null; 
 
         // 5. Parametri di Stato dell'Inseguitore (AI del Mostro)

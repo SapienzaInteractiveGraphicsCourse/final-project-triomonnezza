@@ -107,27 +107,55 @@ document.addEventListener('itemRaccolto', (e) => {
 });
 
 document.addEventListener('portaAperta', (e) => {
-    const doorMesh = e.detail.object;
-    if (doorMesh.userData.isOpen) return;
+    const hitMesh = e.detail.object;
+    const hinge = hitMesh.parentHinge || hitMesh;
 
-    console.log(`[TWEEN]: Porta ${doorMesh.name || 'door'} aperta!`);
-    doorMesh.userData.isOpen = true;
+    // Block interaction while the door is still mid-swing
+    if (hinge.userData.isAnimating) return;
+    // Block closing until the door is fully open
+    if (!hinge.userData.isOpen && hinge.userData.isAnimating) return;
 
-    // Remove collision box from the map so player can walk through
-    if (doorMesh.userData.collisionBox) {
-        doorMesh.userData.collisionBox.makeEmpty();
+    const wasOpen = hinge.userData.isOpen;
+    hinge.userData.isOpen     = !wasOpen;
+    hinge.userData.isAnimating = true;
+
+    if (wasOpen) {
+        // ── CLOSING ─────────────────────────────────────────────────────
+        // Restore closed collision box immediately so the player can't
+        // slip through while the door is swinging shut.
+        if (hinge.userData.collisionBox && hinge.userData.closedBoxMin) {
+            hinge.userData.collisionBox.set(
+                hinge.userData.closedBoxMin,
+                hinge.userData.closedBoxMax
+            );
+        }
+        const targetY = hinge.userData.startRotationY;
+        new TWEEN.Tween(hinge.rotation)
+            .to({ y: targetY }, 800)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .onComplete(() => { hinge.userData.isAnimating = false; })
+            .start();
+        document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: 'Door Closed' } }));
+    } else {
+        // ── OPENING ─────────────────────────────────────────────────────
+        // Clear collision during the swing so the player can walk through.
+        if (hinge.userData.collisionBox) {
+            hinge.userData.collisionBox.makeEmpty();
+        }
+        const targetY = hinge.userData.startRotationY + (Math.PI / 2);
+        new TWEEN.Tween(hinge.rotation)
+            .to({ y: targetY }, 800)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .onComplete(() => {
+                // Recompute the box from the hinge's world-space position at 90°
+                // so the open door still physically blocks movement.
+                hinge.updateMatrixWorld(true);
+                hinge.userData.collisionBox.setFromObject(hinge);
+                hinge.userData.isAnimating = false;
+            })
+            .start();
+        document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: 'Door Opened' } }));
     }
-
-    // Animate rotation (open 90 degrees)
-    const targetY = doorMesh.userData.startRotationY + (Math.PI / 2);
-    
-    new TWEEN.Tween(doorMesh.rotation)
-        .to({ y: targetY }, 800)
-        .easing(TWEEN.Easing.Quadratic.Out)
-        .start();
-        
-    // Optional: play sound or show message
-    document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: "Door Opened" } }));
 });
 
 document.addEventListener('horrorTrigger', (e) => {
