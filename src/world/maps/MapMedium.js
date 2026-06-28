@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { MapBase } from './MapBase.js';
 
 export class MapMedium extends MapBase {
-    load() {
+    async load() {
         console.log('[MapMedium] Loading Variable-Geometry Map...');
+        await super.load();
 
         // ── Visual theme (Plaster / Tiles — aged hospital feel) ──────
         const TM = {
@@ -19,7 +20,7 @@ export class MapMedium extends MapBase {
         // 18 zones: Massive Halls + Long claustrophobic hallways + Junctions
         
         // Massive Halls (4x4)
-        build(0, 0, 4, 4, ['E_1', 'S_2']);                              // R_A (0,0)
+        build(0, 0, 4, 4, ['E_1', 'S_2', 'W_1']); // R_A (0,0)
         build(12, 0, 4, 4, ['W_1', 'S_2']);                             // R_B (12,0)
         build(6, 10, 4, 4, ['N_2', 'W_1', 'E_1', 'S_0', 'S_3']);       // R_C (6,10) - 5 openings!
 
@@ -45,17 +46,8 @@ export class MapMedium extends MapBase {
         build(9, 14, 1, 2, ['N_0', 'S_0']);                             // H_C_down2 (9,14)
         build(7, 16, 2, 1, ['W_0', 'E_0']);                             // H_back (7,16)
 
-        // ── Goal door: parete Ovest di Room A (parete solid, nessuna porta W_*) ──
-        // Room A: cx=14, cz=6, halfW=8 → parete ovest a x=6.
-        // rotY=Math.PI/2 → fronte della porta guarda verso est (dentro la stanza)
-        this.spawnGoalDoor(6 + 0.15, 6, Math.PI / 2);
-
-        // ── Chiave: stanza casuale != Room A ─────────────────────────────────
-        const keyPositions = [
-            new THREE.Vector3(54, 0,  6),   // Room B
-            new THREE.Vector3(30, 0, 46),   // Room C
-        ];
-        this.spawnGoalKey(keyPositions[Math.floor(Math.random() * keyPositions.length)]);
+        // ── Goal door: parete Ovest di Room A ──
+        this.spawnGoalDoor(-2 + 0.15, 6, Math.PI / 2);
 
         // Player spawns in Room A, aligned with the E_1 exit and looking East
         this.playerSpawn = new THREE.Vector3(6, 1.8, 4);
@@ -63,5 +55,8 @@ export class MapMedium extends MapBase {
 
         // Monster spawns far away in Room C
         this.monsterSpawn = new THREE.Vector3(30, 2.454, 46);
+
+        // ── Chiave: posizionata dove spawna il mostro ────────────────────────
+        this.spawnGoalKey(this.monsterSpawn.clone());
     }
 }

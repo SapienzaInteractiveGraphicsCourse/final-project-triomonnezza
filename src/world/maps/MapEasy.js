@@ -16,8 +16,9 @@ import { MapBase } from './MapBase.js';
  *   H1–H6              connecting corridors
  */
 export class MapEasy extends MapBase {
-    load() {
+    async load() {
         console.log('[MapEasy] Loading Decorated Map...');
+        await super.load();
 
         // ── Visual theme ─────────────────────────────────────────────
         const WP = {
@@ -33,7 +34,7 @@ export class MapEasy extends MapBase {
         // ── Rooms ─────────────────────────────────────────────────────
         build(0, 0, 4, 3, ['E_1', 'S_1']);            // Room A
         build(6, 0, 4, 4, ['W_1', 'S_0', 'S_2']);     // Room B
-        build(4, 5, 3, 3, ['N_2', 'W_1', 'E_2']);     // Room C
+        build(4, 5, 3, 3, ['N_2', 'W_1', 'E_2', 'S_1']); // Room C
         build(0, 6, 3, 3, ['N_1', 'E_0']);             // Room D
         build(8, 6, 2, 3, ['W_1', 'N_0']);             // Room E
 
@@ -84,18 +85,12 @@ export class MapEasy extends MapBase {
         // rotY=Math.PI → fronte della porta guarda verso nord (dentro la stanza)
         this.spawnGoalDoor(20, 30 - 0.15, Math.PI);
 
-        // ── Chiave: stanza casuale != Room C ─────────────────────────────────
-        const keyPositions = [
-            new THREE.Vector3( 6, 0,  4),   // Room A
-            new THREE.Vector3(30, 0,  6),   // Room B
-            new THREE.Vector3( 4, 0, 28),   // Room D
-            new THREE.Vector3(34, 0, 28),   // Room E
-        ];
-        this.spawnGoalKey(keyPositions[Math.floor(Math.random() * keyPositions.length)]);
-
         // ── Spawns ────────────────────────────────────────────────────────────
         this.playerSpawn         = new THREE.Vector3(22, 2.5, 26);
         this.playerSpawnRotationY = Math.PI / 2;
         this.monsterSpawn         = new THREE.Vector3(30, 2.454, 6);
+
+        // ── Chiave: posizionata dove spawna il mostro ────────────────────────
+        this.spawnGoalKey(this.monsterSpawn.clone());
     }
 }

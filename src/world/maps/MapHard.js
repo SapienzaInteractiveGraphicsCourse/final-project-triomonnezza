@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { MapBase } from './MapBase.js';
 
 export class MapHard extends MapBase {
-    load() {
+    async load() {
+        console.log('[MapHard] Loading Hard Map...');
+        await super.load();
         console.log('[MapHard] Loading 100% Asymmetrical, Loop-Only Web...');
 
         // ── Visual theme (Stone / Brick — dark dungeon feel) ────────
@@ -19,7 +21,7 @@ export class MapHard extends MapBase {
         // 31 zones: Completely organic, zero dead ends, massive overlapping loops
         
         // Rooms
-        build(0, 0, 3, 3, ['E_1', 'S_1', 'N_0']);       // A (Spawn)
+        build(0, 0, 3, 3, ['E_1', 'S_1', 'N_0', 'W_1']); // Room A (start)
         build(7, 0, 4, 4, ['W_1', 'S_2', 'E_2', 'N_1']); // B
         build(0, 8, 3, 4, ['N_1', 'E_1', 'E_3', 'S_0']); // C
         build(7, 8, 3, 5, ['N_2', 'W_1', 'E_4', 'W_3']); // D
@@ -58,18 +60,8 @@ export class MapHard extends MapBase {
         build(26, 8, 1, 8, ['N_0', 'S_0']);              // H24 (M to N)
         build(18, 17, 6, 1, ['W_0', 'E_0']);             // H25 (H to N)
 
-        // ── Goal door: parete Ovest di Room A (parete solid, nessuna porta W_*) ──
-        // Room A: cx=4, cz=4, halfW=6 → parete ovest a x=-2.
-        // rotY=Math.PI/2 → fronte guarda verso est (dentro la stanza)
+        // ── Goal door: parete Ovest di Room A ──
         this.spawnGoalDoor(-2 + 0.15, 4, Math.PI / 2);
-
-        // ── Chiave: stanza casuale != Room A ─────────────────────────────────
-        const keyPositions = [
-            new THREE.Vector3(34, 0,  6),   // Room B
-            new THREE.Vector3( 4, 0, 38),   // Room C
-            new THREE.Vector3(64, 0, 10),   // Room E
-        ];
-        this.spawnGoalKey(keyPositions[Math.floor(Math.random() * keyPositions.length)]);
 
         // Player spawns in Room A, looking East towards H1
         this.playerSpawn = new THREE.Vector3(4, 1.8, 4);
@@ -77,5 +69,8 @@ export class MapHard extends MapBase {
 
         // Monster spawns in Room I
         this.monsterSpawn = new THREE.Vector3(6, 2.454, 102);
+
+        // ── Chiave: posizionata dove spawna il mostro ────────────────────────
+        this.spawnGoalKey(this.monsterSpawn.clone());
     }
 }

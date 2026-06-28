@@ -639,7 +639,9 @@ export class MapBase {
         }
     }
 
-    load() {}
+    async load() {
+        await InteriorAssetManager.preloadAll();
+    }
 
     getCollisionBoxes() { return this.collisionBoxes; }
     getTriggerZones()   { return this.triggerZones; }
