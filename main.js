@@ -104,7 +104,7 @@ document.addEventListener('itemRaccolto', (e) => {
     showHudMessage('Chiave raccolta! Torna alla porta dorata.');
     if (e.detail.idChiave === 'chiave_goal') {
         const keyHud = document.getElementById('key-hud');
-        if (keyHud) keyHud.style.display = 'block';
+        if (keyHud) keyHud.style.display = 'flex';
     }
 });
 
