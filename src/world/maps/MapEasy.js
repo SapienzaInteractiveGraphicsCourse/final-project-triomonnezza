@@ -79,12 +79,23 @@ export class MapEasy extends MapBase {
         this.spawnProp('plant.glb',       new THREE.Vector3(37, 0, 33));
         this.spawnProp('trashBin.glb',    new THREE.Vector3(37, 0, 24));
 
-        // ── Spawns ────────────────────────────────────────────────────
+        // ── Goal door: parete Sud di Room C (nessuna porta su quel lato) ──────
+        // Room C: cx=20, cz=24, halfD=6 → parete sud a z=30.
+        // rotY=Math.PI → fronte della porta guarda verso nord (dentro la stanza)
+        this.spawnGoalDoor(20, 30 - 0.15, Math.PI);
+
+        // ── Chiave: stanza casuale != Room C ─────────────────────────────────
+        const keyPositions = [
+            new THREE.Vector3( 6, 0,  4),   // Room A
+            new THREE.Vector3(30, 0,  6),   // Room B
+            new THREE.Vector3( 4, 0, 28),   // Room D
+            new THREE.Vector3(34, 0, 28),   // Room E
+        ];
+        this.spawnGoalKey(keyPositions[Math.floor(Math.random() * keyPositions.length)]);
+
+        // ── Spawns ────────────────────────────────────────────────────────────
         this.playerSpawn         = new THREE.Vector3(22, 2.5, 26);
         this.playerSpawnRotationY = Math.PI / 2;
         this.monsterSpawn         = new THREE.Vector3(30, 2.454, 6);
-
-        // Goal trigger in Room E
-        this.addTrigger(34, 2, 28, 'GOAL_REACHED');
     }
 }

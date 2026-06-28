@@ -486,7 +486,134 @@ export class MapBase {
         });
     }
 
+    /**
+     * Spawna la chiave del goal: geometria procedurale oro lucido + glow.
+     * Interattiva (E per raccogliere). Animata nel loop update().
+     * @param {THREE.Vector3} position  Posizione world (Y sovrascritta a 1.3m)
+     */
+    spawnGoalKey(position) {
+        const goldMat = new THREE.MeshStandardMaterial({
+            color: 0xFFD700, metalness: 1.0, roughness: 0.08,
+            emissive: 0xFFAA00, emissiveIntensity: 0.6,
+        });
+
+        const group = new THREE.Group();
+
+        // Stelo orizzontale
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.44, 10), goldMat);
+        stem.rotation.z = Math.PI / 2;
+        group.add(stem);
+
+        // Anello
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.038, 8, 16), goldMat);
+        ring.position.x = -0.29;
+        group.add(ring);
+
+        // Denti della chiave
+        const toothGeo = new THREE.BoxGeometry(0.07, 0.09, 0.045);
+        [0.05, -0.07].forEach(ox => {
+            const t = new THREE.Mesh(toothGeo, goldMat);
+            t.position.set(ox, -0.09, 0);
+            group.add(t);
+        });
+
+        // Glow
+        const glow = new THREE.PointLight(0xFFAA00, 5.0, 6);
+        group.add(glow);
+
+        group.position.copy(position);
+        group.position.y = 1.3;
+        group.scale.setScalar(1.2);
+
+        // Rendi interattivo ogni child mesh
+        group.traverse(child => {
+            if (child.isMesh) {
+                child.userData = {
+                    isInteractive: true,
+                    tipo: 'chiave',
+                    idChiave: 'chiave_goal',
+                };
+            }
+        });
+
+        this.scene.add(group);
+        this._goalKeyGroup = group;
+        this._goalKeyTime  = 0;
+        return group;
+    }
+
+    /**
+     * Spawna la porta del goal: pannello scuro con cornice dorata + lucchetto.
+     * Visivamente distinta dalle porte dei corridoi (hinged door).
+     * Interattiva con tipo 'porta_goal'. Premere E con la chiave → vittoria.
+     * @param {number} x, z     Posizione world
+     * @param {number} rotationY  0=N, PI=S, PI/2=E, -PI/2=W (facing into room)
+     */
+    spawnGoalDoor(x, z, rotationY = 0) {
+        const doorMat  = new THREE.MeshStandardMaterial({ color: 0x2A1200, metalness: 0.1, roughness: 0.8 });
+        const frameMat = new THREE.MeshStandardMaterial({
+            color: 0xFFD700, metalness: 1.0, roughness: 0.1,
+            emissive: 0xCC8800, emissiveIntensity: 0.35,
+        });
+        const lockMat  = new THREE.MeshStandardMaterial({ color: 0xCC7700, metalness: 1.0, roughness: 0.15 });
+
+        const group = new THREE.Group();
+
+        // Pannello porta
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(2.2, 4.0, 0.14), doorMat);
+        group.add(panel);
+
+        // Cornice dorata
+        const fH = new THREE.Mesh(new THREE.BoxGeometry(2.68, 0.15, 0.22), frameMat);
+        const fTop = fH.clone(); fTop.position.y =  2.12; group.add(fTop);
+        const fBot = fH.clone(); fBot.position.y = -2.12; group.add(fBot);
+        const fV = new THREE.Mesh(new THREE.BoxGeometry(0.15, 4.32, 0.22), frameMat);
+        const fL = fV.clone(); fL.position.x = -1.22; group.add(fL);
+        const fR = fV.clone(); fR.position.x =  1.22; group.add(fR);
+
+        // Lucchetto corpo
+        const lockBody = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.34, 0.24), lockMat);
+        lockBody.position.set(0.55, 0, 0.14);
+        group.add(lockBody);
+        // Lucchetto arco
+        const shackle = new THREE.Mesh(
+            new THREE.TorusGeometry(0.12, 0.030, 8, 12, Math.PI), lockMat
+        );
+        shackle.position.set(0.55, 0.24, 0.14);
+        group.add(shackle);
+
+        // Glow dorato sulla porta
+        const glow = new THREE.PointLight(0xFFAA00, 3.0, 7);
+        glow.position.set(0, 0, 1.0);
+        group.add(glow);
+
+        group.position.set(x, 2.25, z);
+        group.rotation.y = rotationY;
+        group.updateMatrixWorld(true);
+
+        // Interattività
+        group.traverse(child => {
+            if (child.isMesh) {
+                child.userData = {
+                    isInteractive: true,
+                    tipo: 'porta_goal',
+                    nome: 'Porta di Uscita',
+                };
+            }
+        });
+
+        // Collisione — verrà svuotata all'apertura
+        const box = new THREE.Box3().setFromObject(group);
+        this.collisionBoxes.push(box);
+        this._goalDoorBox   = box;
+        this._goalDoorGroup = group;
+
+        this.scene.add(group);
+        return group;
+    }
+
     update(deltaTime) {
+        // Flicker luci corridoio
         for (const obj of this.flickeringLights) {
             obj.timer -= deltaTime;
             if (obj.isFlickering) {
@@ -502,6 +629,13 @@ export class MapBase {
                     obj.timer = 0.3 + Math.random() * 1.0;
                 }
             }
+        }
+
+        // Animazione chiave: rotazione e galleggiamento sinusoidale
+        if (this._goalKeyGroup) {
+            this._goalKeyTime = (this._goalKeyTime || 0) + deltaTime;
+            this._goalKeyGroup.rotation.y = this._goalKeyTime * 2.0;
+            this._goalKeyGroup.position.y = 1.3 + Math.sin(this._goalKeyTime * 2.2) * 0.12;
         }
     }
 

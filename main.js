@@ -102,8 +102,10 @@ document.addEventListener('uiTargetChanged', (e) => {
 });
 
 document.addEventListener('itemRaccolto', (e) => {
-    console.log(`[GIOCO]: Raccolto: ${e.detail.object.name}`);
+    console.log('[GIOCO]: Raccolto chiave!');
     scene.remove(e.detail.object);
+    if (currentMap) currentMap._goalKeyGroup = null;
+    showHudMessage('Chiave raccolta! Torna alla porta dorata.');
 });
 
 document.addEventListener('portaAperta', (e) => {
@@ -158,9 +160,81 @@ document.addEventListener('portaAperta', (e) => {
     }
 });
 
+document.addEventListener('portaGoalAperta', (e) => {
+    if (currentMap && currentMap._goalDoorBox) currentMap._goalDoorBox.makeEmpty();
+    const group = e.detail.object.parent || e.detail.object;
+    new TWEEN.Tween(group.scale)
+        .to({ x: 0.001, y: 0.001, z: 0.001 }, 600)
+        .easing(TWEEN.Easing.Back.In)
+        .onComplete(() => { scene.remove(group); setTimeout(showWinScreen, 400); })
+        .start();
+    showHudMessage('La porta si apre... Sei libero!');
+});
+
+document.addEventListener('logMessaggioUI', (e) => {
+    showHudMessage(e.detail.testo);
+});
+
 document.addEventListener('horrorTrigger', (e) => {
     console.warn(`[TRIGGER]: Zona: ${e.detail.eventName}`);
+    if (e.detail.eventName === 'GOAL_REACHED') showWinScreen();
 });
+
+function showHudMessage(text) {
+    let hud = document.getElementById('hud-message');
+    if (!hud) {
+        hud = document.createElement('div');
+        hud.id = 'hud-message';
+        Object.assign(hud.style, {
+            position: 'fixed', bottom: '80px', left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.78)', color: '#FFD700',
+            padding: '10px 24px', borderRadius: '8px',
+            fontFamily: 'monospace', fontSize: '16px',
+            border: '1px solid rgba(255,215,0,0.5)',
+            pointerEvents: 'none', zIndex: '999',
+            opacity: '0', transition: 'opacity 0.3s',
+        });
+        document.body.appendChild(hud);
+    }
+    hud.textContent = text;
+    hud.style.opacity = '1';
+    clearTimeout(hud._timeout);
+    hud._timeout = setTimeout(() => { hud.style.opacity = '0'; }, 3500);
+}
+
+function showWinScreen() {
+    if (player) player.controls.unlock();
+    let win = document.getElementById('win-overlay');
+    if (!win) {
+        win = document.createElement('div');
+        win.id = 'win-overlay';
+        win.innerHTML = `
+            <div style="text-align:center;padding:40px;background:rgba(0,0,0,0.85);
+                        border:2px solid #FFD700;border-radius:16px;max-width:500px">
+                <div style="font-size:3.5rem;margin-bottom:12px">&#x1F511;&#x1F6AA;</div>
+                <h1 style="font-size:2.4rem;color:#FFD700;margin:0 0 8px">SEI SCAPPATO!</h1>
+                <p style="font-size:1rem;color:#ccc;margin-bottom:28px">
+                    Hai trovato la chiave dorata e aperto la porta dell'uscita.
+                </p>
+                <button onclick="location.reload()"
+                    style="padding:12px 36px;background:#FFD700;color:#111;border:none;
+                           border-radius:8px;font-size:1rem;cursor:pointer;
+                           font-weight:bold;letter-spacing:1px">
+                    GIOCA ANCORA
+                </button>
+            </div>`;
+        Object.assign(win.style, {
+            position: 'fixed', inset: '0',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'radial-gradient(ellipse at center,rgba(26,10,0,0.6),rgba(0,0,0,0.95))',
+            fontFamily: "'Segoe UI',sans-serif", zIndex: '9999',
+        });
+        document.body.appendChild(win);
+    }
+    win.style.display = 'flex';
+}
+
 
 document.addEventListener('playerMorto', () => {
     alert('GAME OVER: You have been defeated!');

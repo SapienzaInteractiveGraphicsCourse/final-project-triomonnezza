@@ -43,7 +43,7 @@ export class LightingSetup {
     /** Luce ambientale globale molto bassa — il buio è protagonista */
     _initAmbient() {
         // TODO Davide: scegli colore (leggermente bluastro per horror) e intensity 0.05-0.15
-        const ambient = new THREE.AmbientLight(0x111122, 0.1);
+        const ambient = new THREE.AmbientLight(0x111122, 0.02);
         this.scene.add(ambient);
     }
 

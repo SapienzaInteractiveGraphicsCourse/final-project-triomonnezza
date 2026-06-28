@@ -327,20 +327,32 @@ export class PlayerController {
             this.inventario.add(objData.idChiave);
             console.log(`Inventario Aggiornato: Raccolta ${objData.idChiave}`);
             
-            // Notifica la scomparsa dell'oggetto (L'Artista lo rimuove dalla scena, il Regista fa un Tween di raccolta)
-            this._dispatchGlobalEvent('itemRaccolto', { object: this.interactiveObject });
+            // Passa il gruppo padre per rimuovere l'intero oggetto dalla scena
+            const toRemove = this.interactiveObject.parent || this.interactiveObject;
+            this._dispatchGlobalEvent('itemRaccolto', { object: toRemove, idChiave: objData.idChiave });
             this.interactiveObject = null;
             return;
         }
 
-        // Sotto-logica 2: Controllo Accessi (Porte Bloccate)
+        // Sotto-logica 2: Porta del Goal (richiede chiave dorata)
+        if (objData.tipo === 'porta_goal') {
+            if (!this.inventario.has('chiave_goal')) {
+                this._dispatchGlobalEvent('logMessaggioUI', { testo: '🔒 Trova la chiave dorata per aprire questa porta!' });
+                return;
+            }
+            this._dispatchGlobalEvent('portaGoalAperta', { object: this.interactiveObject });
+            this.interactiveObject = null;
+            return;
+        }
+
+        // Sotto-logica 3: Controllo Accessi (Porte normali bloccate)
         if (objData.tipo === 'porta') {
             if (objData.richiedeChiave && !this.inventario.has(objData.idChiave)) {
                 this._dispatchGlobalEvent('logMessaggioUI', { testo: "La porta è serrata dall'interno. Serve una chiave." });
                 return;
             }
 
-            // Se sbloccata o libera, lancia l'evento di sblocco. Il Regista (Studente C) eseguirà il Tween sulla mesh
+            // Se sbloccata o libera, lancia l'evento di sblocco
             this._dispatchGlobalEvent('portaAperta', { object: this.interactiveObject });
         }
     }
