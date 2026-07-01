@@ -39,27 +39,77 @@ export const interiorTiles = [
 
 // Props used by the maps (bed, chair, etc.)
 export const interiorProps = [
+    // Seating & beds
     'bed.glb',
+    'bed2.glb',
     'chair.glb',
+    'chair2.glb',
+    'chair3.glb',
+    'couchSmall.glb',
+    'couchSmall2.glb',
+    'couchBig.glb',
+
+    // Tables & desks
     'table.glb',
+    'table2.glb',
+    'tableSmall.glb',
+    'tableSmall2.glb',
+
+    // Storage
     'bookshelf.glb',
     'cabinet.glb',
     'cabinetHigh.glb',
-    'couchSmall.glb',
-    'trashBin.glb',
-    'lamp.glb',
-    'plant.glb',
+    'cabinetLow.glb',
     'sideboard.glb',
+    'sideboard2.glb',
+    'shelves.glb',
+    'wallShelf.glb',
+    'wallShelf2.glb',
+
+    // Decorative / wall items
     'painting.glb',
     'painting2.glb',
     'painting3.glb',
+    'painting4.glb',
+    'mirror.glb',
+    'mirror2.glb',
     'clock.glb',
+    'wallLight.glb',
+
+    // Electronics / appliances
     'radio.glb',
     'phone.glb',
+    'tv.glb',
+    'lamp.glb',
+    'tableLamp.glb',
+
+    // Bathroom
+    'bathroomSink.glb',
+    'toilet.glb',
+    'toiletPaper.glb',
+
+    // Nature
+    'plant.glb',
+    'plant2.glb',
+
+    // Junk & clutter
     'book.glb',
     'bookStack.glb',
+    'bookStack2.glb',
     'box.glb',
+    'box2.glb',
+    'trashBin.glb',
+    'trashBag.glb',
+    'bucket.glb',
+    'broom.glb',
+
+    // Misc
     'flashlight.glb',
+    'radiator.glb',
+    'breakerBox.glb',
+    'ladder.glb',
+    'carpet.glb',
+    'carpet2.glb',
 ];
 
 class InteriorAssetManagerClass {

@@ -40,11 +40,12 @@ export class MapBase {
         return mesh;
     }
 
-    spawnTile(filename, position, rotationY = 0) {
+    spawnTile(filename, position, rotationY = 0, scale = 1.0) {
         const mesh = InteriorAssetManager.get(filename);
         if (!mesh) return null;
         mesh.position.copy(position);
         mesh.rotation.set(0, rotationY, 0);
+        mesh.scale.setScalar(scale);
         this.scene.add(mesh);
         return mesh;
     }
@@ -247,7 +248,8 @@ export class MapBase {
         this._buildVisibleWallWithGaps(cx - w/2, cz, false, doorways, 'W', rows, startZ, tileSize, wallH, wallT, doorWidth, wallBaseMat);
         this._buildVisibleWallWithGaps(cx + w/2, cz, false, doorways, 'E', rows, startZ, tileSize, wallH, wallT, doorWidth, wallBaseMat);
 
-        const light = new THREE.PointLight(0xffeedd, 1.0, 15);
+        // Faint fill light — main illumination comes from ceiling lamps placed by each map
+        const light = new THREE.PointLight(0xffeedd, 0.3, cols * 6);
         light.position.set(cx, wallH - 0.5, cz);
         this.scene.add(light);
     }
@@ -468,10 +470,77 @@ export class MapBase {
 
     /**
      * Spawns a decorative prop with no collision.
-     * Identical to spawnTile but semantically named for readability in map files.
+     * Sets default scale to 2.2 to fix tiny furniture.
      */
-    spawnProp(filename, position, rotationY = 0) {
-        return this.spawnTile(filename, position, rotationY);
+    spawnProp(filename, position, rotationY = 0, scale = 2.2) {
+        return this.spawnTile(filename, position, rotationY, scale);
+    }
+
+    /**
+     * Spawns a wall-mounted decoration (painting, mirror, shelf, clock, etc.)
+     * correctly positioned flush against a wall face, at a comfortable viewing height.
+     *
+     * @param {string}  filename    GLB asset name
+     * @param {'N'|'S'|'E'|'W'} wall  Which wall it hangs on
+     * @param {number}  wallX       World X of the wall centre (or prop X along wall)
+     * @param {number}  wallZ       World Z of the wall centre (or prop Z along wall)
+     * @param {number}  wallY       World Y of the wall face (default 0 for floor-level walls)
+     * @param {number}  hangY       Height above floor to hang the prop (default 1.8)
+     * @param {number}  inset       How far off the wall surface (default 0.28)
+     */
+    spawnWallProp(filename, wall, wallX, wallZ, wallY = 0, hangY = 1.8, inset = 0.28) {
+        let posX = wallX;
+        let posZ = wallZ;
+        let rotY = 0;
+
+        // Face the prop inward (toward the room interior)
+        switch (wall) {
+            case 'N': posZ += inset; rotY = 0;           break; // North wall → face South
+            case 'S': posZ -= inset; rotY = Math.PI;     break; // South wall → face North
+            case 'W': posX += inset; rotY = Math.PI / 2; break; // West wall  → face East
+            case 'E': posX -= inset; rotY = -Math.PI / 2;break; // East wall  → face West
+        }
+
+        return this.spawnTile(filename, new THREE.Vector3(posX, hangY, posZ), rotY);
+    }
+
+    /**
+     * Spawns a ceiling lamp GLB + a PointLight hanging below it.
+     * The lamp model is placed at the ceiling (ceilingY), the light sits 0.6m below.
+     *
+     * @param {number} x          World X position
+     * @param {number} z          World Z position
+     * @param {number} ceilingY   World Y of the ceiling surface (default 5.5)
+     * @param {number} intensity  Light intensity (default 0.8 for softer look)
+     * @param {number} distance   Light reach in metres (default 12)
+     * @param {number} color      Light colour hex (default warm white 0xfff0cc)
+     * @param {boolean} flickers  Whether this light should randomly flicker
+     * @param {number} scale      Scale factor for the lamp model
+     */
+    spawnCeilingLamp(x, z, ceilingY = 5.5, intensity = 0.8, distance = 12, color = 0xfff0cc, flickers = false, scale = 2.0) {
+        // Place the GLB model hanging from the ceiling
+        const model = InteriorAssetManager.get('ceilingLight.glb');
+        if (model) {
+            model.position.set(x, ceilingY, z);
+            model.scale.setScalar(scale);
+            this.scene.add(model);
+        }
+
+        // Point light hangs 0.6m below the ceiling
+        const light = new THREE.PointLight(color, intensity, distance);
+        light.position.set(x, ceilingY - 0.6, z);
+        this.scene.add(light);
+
+        if (flickers) {
+            this.flickeringLights.push({
+                light,
+                timer: Math.random() * 8.0,
+                isFlickering: false,
+                baseIntensity: intensity,
+            });
+        }
+
+        return light;
     }
 
     addTrigger(x, y, z, name) {

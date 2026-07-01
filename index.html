@@ -150,6 +150,9 @@
             align-items: center;
             text-align: center;
             z-index: 30;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         #fade-overlay {
@@ -246,29 +249,38 @@
             z-index: 20;
             background: rgba(0,0,0,0.95);
         }
-        #instructions h1 {
-            font-size: 5rem;
-            color: var(--crimson);
+        #instructions .title-container {
             margin-bottom: 10px;
-            text-shadow: 4px 4px 0 #000;
+        }
+        #instructions .glitch-text {
+            font-size: 3rem; /* Scaled down further for pause menu */
+        }
+        #instructions .subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+        #instructions .click-prompt {
+            font-size: 1.2rem;
+            margin: 5px 0 15px;
         }
         .click-prompt {
             font-size: 2rem;
-            color: var(--bone-dim);
-            margin-bottom: 40px;
+            color: var(--bone);
+            margin: 10px 0 20px;
+            animation: blink 2s steps(2, start) infinite;
         }
         .controls-list {
             background: #111;
-            padding: 20px 40px;
+            padding: 10px 20px;
             border: 2px solid #333;
             text-align: left;
             list-style: none;
             box-shadow: 4px 4px 0 #000;
         }
         .controls-list li {
-            margin: 15px 0;
+            margin: 8px 0;
             color: var(--bone);
-            font-size: 1.5rem;
+            font-size: 1.1rem;
         }
         .kbd {
             background: #222;
@@ -333,8 +345,10 @@
     </div>
 
     <div id="instructions" class="overlay-screen">
-        <h1>SURVIVE</h1>
-        <p class="click-prompt">Click to enter the nightmare</p>
+        <div class="title-container">
+            <h1 class="glitch-text" data-text="SURVIVE">SURVIVE</h1>
+            <p class="subtitle">Click to enter the nightmare</p>
+        </div>
         <ul class="controls-list">
             <li><span class="kbd">W A S D</span> Movement</li>
             <li><span class="kbd">Space</span> Sprint</li>
@@ -342,6 +356,33 @@
             <li><span class="kbd">E</span> Interact</li>
             <li><span class="kbd">ESC</span> Pause</li>
         </ul>
+        <div class="menu-buttons" style="margin-top: 10px; z-index: 100;">
+            <button class="diff-btn restart-btn" style="font-size: 1.2rem; padding: 6px 0;" onclick="location.href='?diff=' + (window.currentDifficulty || 'easy')">RESTART</button>
+            <button class="diff-btn mainmenu-btn" style="font-size: 1.2rem; padding: 6px 0;" onclick="location.href='index.html'">MAIN MENU</button>
+        </div>
+    </div>
+
+    <div id="gameover-overlay" class="overlay-screen" style="display: none; background: rgba(5, 0, 0, 0.95); z-index: 9999;">
+        <div class="title-container">
+            <div style="font-size:6rem;color:var(--crimson);margin-bottom:10px;text-shadow:4px 4px 0 #000">☠</div>
+            <h1 class="glitch-text" data-text="SEI MORTO" style="text-shadow: 4px 4px 0 var(--crimson);">SEI MORTO</h1>
+            <p class="subtitle">La bestia ha preteso un'altra anima</p>
+        </div>
+        <div class="menu-buttons" style="margin-top: 20px;">
+            <button class="diff-btn restart-btn" onclick="location.href='?diff=' + (window.currentDifficulty || 'easy')">RIPROVA</button>
+            <button class="diff-btn mainmenu-btn" onclick="location.href='index.html'">MENU PRINCIPALE</button>
+        </div>
+    </div>
+
+    <div id="win-overlay" class="overlay-screen" style="display: none; background: rgba(0, 0, 0, 0.95); z-index: 9999;">
+        <div class="title-container">
+            <div style="font-size:5rem;margin-bottom:20px;text-shadow:4px 4px 0 var(--gold)">🔑🚪</div>
+            <h1 class="glitch-text" data-text="ESCAPED" style="color: var(--gold); text-shadow: 4px 4px 0 #000;">ESCAPED</h1>
+            <p class="subtitle" style="color: var(--bone);">You have unlocked the nightmare.</p>
+        </div>
+        <div class="menu-buttons" style="margin-top: 20px;">
+            <button class="diff-btn mainmenu-btn" onclick="location.href='index.html'">MAIN MENU</button>
+        </div>
     </div>
 
     <div id="crosshair"></div>
@@ -385,6 +426,7 @@
         document.querySelectorAll('.diff-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const diff = e.currentTarget.getAttribute('data-diff');
+                if (!diff) return; // Ignora pulsanti restart/main menu
 
                 // Mostra loading, nascondi menu
                 mainMenu.style.display = 'none';
@@ -457,12 +499,14 @@
         });
 
         // ── Auto-start (per Retry) ──────────────────────────────────
-        const urlParams = new URLSearchParams(window.location.search);
-        const autoDiff = urlParams.get('diff');
-        if (autoDiff) {
-            const btn = document.querySelector(`.diff-btn[data-diff="${autoDiff}"]`);
-            if (btn) btn.click();
-        }
+        window.addEventListener('load', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoDiff = urlParams.get('diff');
+            if (autoDiff) {
+                const btn = document.querySelector(`.diff-btn[data-diff="${autoDiff}"]`);
+                if (btn) btn.click();
+            }
+        });
     </script>
 </body>
 </html>

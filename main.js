@@ -19,12 +19,12 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = false; // Disabilitato per performance (gioco horror = buio di default)
 document.body.appendChild(renderer.domElement);
 
-// Luce ambientale abbassata per atmosfera più cupa
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+// Luce ambientale minima — solo per evitare nero assoluto; le lampade al soffitto sono le vere fonti di luce
+const ambientLight = new THREE.AmbientLight(0x111122, 0.06);
 scene.add(ambientLight);
 
-// Luce direzionale per dare profondità 3D (abbassata)
-const dirLight = new THREE.DirectionalLight(0xffeedd, 0.2);
+// Luce direzionale minima — solo per definizione volumetrica di base
+const dirLight = new THREE.DirectionalLight(0xffeedd, 0.05);
 dirLight.position.set(10, 20, 10);
 scene.add(dirLight);
 
@@ -137,7 +137,6 @@ document.addEventListener('portaAperta', (e) => {
             .easing(TWEEN.Easing.Quadratic.Out)
             .onComplete(() => { hinge.userData.isAnimating = false; })
             .start();
-        document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: 'Door Closed' } }));
     } else {
         // ── OPENING ─────────────────────────────────────────────────────
         // Clear collision during the swing so the player can walk through.
@@ -156,7 +155,6 @@ document.addEventListener('portaAperta', (e) => {
                 hinge.userData.isAnimating = false;
             })
             .start();
-        document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: 'Door Opened' } }));
     }
 });
 
@@ -205,39 +203,10 @@ function showHudMessage(text) {
 
 function showWinScreen() {
     if (player) player.controls.unlock();
-    let win = document.getElementById('win-overlay');
-    if (!win) {
-        win = document.createElement('div');
-        win.id = 'win-overlay';
-        win.innerHTML = `
-            <div style="text-align:center;padding:40px;background:#111;
-                        border:4px solid #ccaa00;max-width:600px;
-                        box-shadow:8px 8px 0 #000">
-                <div style="font-size:5rem;margin-bottom:20px;text-shadow:4px 4px 0 #000">&#x1F511;&#x1F6AA;</div>
-                <h1 style="font-family:'VT323',monospace;font-size:5rem;color:#ccaa00;margin:0 0 10px;
-                           text-shadow:4px 4px 0 #000;text-transform:uppercase;">ESCAPED</h1>
-                <p style="font-family:'VT323',monospace;font-size:1.8rem;color:#d9d9d9;margin-bottom:40px;text-transform:uppercase;">
-                    You have unlocked the nightmare.
-                </p>
-                <button onclick="location.href='index.html'"
-                    style="padding:16px 40px;background:#222;color:#ccaa00;border:4px solid #ccaa00;
-                           font-family:'VT323',monospace;font-size:2rem;cursor:pointer;
-                           text-transform:uppercase;box-shadow:4px 4px 0 #000;"
-                    onmouseover="this.style.background='#443300';this.style.color='#fff';this.style.transform='translate(-2px,-2px)';this.style.boxShadow='6px 6px 0 #000'"
-                    onmouseout="this.style.background='#222';this.style.color='#ccaa00';this.style.transform='translate(0,0)';this.style.boxShadow='4px 4px 0 #000'"
-                    onmousedown="this.style.transform='translate(2px,2px)';this.style.boxShadow='0 0 0 #000'">
-                    MAIN MENU
-                </button>
-            </div>`;
-        Object.assign(win.style, {
-            position: 'fixed', inset: '0',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.95)',
-            zIndex: '9999'
-        });
-        document.body.appendChild(win);
+    const win = document.getElementById('win-overlay');
+    if (win) {
+        win.style.display = 'flex';
     }
-    win.style.display = 'flex';
 }
 
 
@@ -247,50 +216,10 @@ document.addEventListener('playerMorto', () => {
 
 function showGameOverScreen() {
     if (player) player.controls.unlock();
-    let over = document.getElementById('gameover-overlay');
-    if (!over) {
-        over = document.createElement('div');
-        over.id = 'gameover-overlay';
-        over.innerHTML = `
-            <div style="text-align:center;padding:50px 60px;background:#050000;
-                        border:4px solid #990000;max-width:600px;
-                        box-shadow:8px 8px 0 #000">
-                <div style="font-size:6rem;color:#990000;margin-bottom:10px;text-shadow:4px 4px 0 #000">&#x2620;</div>
-                <h1 style="font-family:'VT323',monospace;font-size:6rem;color:#d9d9d9;margin:0 0 10px;
-                           text-shadow:4px 4px 0 #990000;text-transform:uppercase;">SEI MORTO</h1>
-                <p style="font-family:'VT323',monospace;font-size:1.8rem;color:#777;margin-bottom:40px;text-transform:uppercase;">
-                    La bestia ha preteso un'altra anima
-                </p>
-                <div style="display:flex; flex-direction:column; gap:20px; align-items:center;">
-                    <button onclick="location.href='?diff=' + (window.currentDifficulty || 'easy')"
-                        style="width:300px;padding:16px;background:#111;color:#d9d9d9;border:4px solid #550000;
-                               font-family:'VT323',monospace;font-size:2rem;cursor:pointer;
-                               text-transform:uppercase;box-shadow:4px 4px 0 #000;"
-                        onmouseover="this.style.background='#330000';this.style.borderColor='#990000';this.style.color='#fff';this.style.transform='translate(-2px,-2px)';this.style.boxShadow='6px 6px 0 #000'"
-                        onmouseout="this.style.background='#111';this.style.borderColor='#550000';this.style.color='#d9d9d9';this.style.transform='translate(0,0)';this.style.boxShadow='4px 4px 0 #000'"
-                        onmousedown="this.style.transform='translate(2px,2px)';this.style.boxShadow='0 0 0 #000'">
-                        RIPROVA
-                    </button>
-                    <button onclick="location.href='index.html'"
-                        style="width:300px;padding:16px;background:#111;color:#777;border:4px solid #333;
-                               font-family:'VT323',monospace;font-size:2rem;cursor:pointer;
-                               text-transform:uppercase;box-shadow:4px 4px 0 #000;"
-                        onmouseover="this.style.background='#222';this.style.borderColor='#555';this.style.color='#d9d9d9';this.style.transform='translate(-2px,-2px)';this.style.boxShadow='6px 6px 0 #000'"
-                        onmouseout="this.style.background='#111';this.style.borderColor='#333';this.style.color='#777';this.style.transform='translate(0,0)';this.style.boxShadow='4px 4px 0 #000'"
-                        onmousedown="this.style.transform='translate(2px,2px)';this.style.boxShadow='0 0 0 #000'">
-                        MENU PRINCIPALE
-                    </button>
-                </div>
-            </div>`;
-        Object.assign(over.style, {
-            position: 'fixed', inset: '0',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(5,0,0,0.95)',
-            zIndex: '9999'
-        });
-        document.body.appendChild(over);
+    const over = document.getElementById('gameover-overlay');
+    if (over) {
+        over.style.display = 'flex';
     }
-    over.style.display = 'flex';
 }
 
 // ==========================================
@@ -332,6 +261,7 @@ window.addEventListener('resize', () => {
 });
 
 // Click su instructions → sblocca puntatore (registrato una sola volta)
-document.getElementById('instructions').addEventListener('click', () => {
+document.getElementById('instructions').addEventListener('click', (e) => {
+    if (e.target.tagName === 'BUTTON') return;
     if (player) player.controls.lock();
 });
