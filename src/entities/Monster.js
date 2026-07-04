@@ -21,6 +21,7 @@
 
 import * as THREE from 'three';
 import * as TWEEN from '@tweenjs/tween.js';
+import { AudioSystem } from '../core/AudioSystem.js';
 
 export class Monster {
     constructor() {
@@ -220,10 +221,23 @@ export class Monster {
         this.gambaDx       = gambaDx;
     }
 
-    /** Aggiunge il mostro alla scena nella posizione specificata */
-    addToScene(scene, position) {
-        this.root.position.copy(position);
-        scene.add(this.root);
+    /** Inizializza i suoni posizionali (chiamato dopo il preload) */
+    initAudio() {
+        // Aggiungi audio posizionale
+        this.stepSound = AudioSystem.getPositionalSound('tunnel_steps', 8, 1.0);
+        if (this.stepSound) {
+            this.stepSound.setLoop(true);
+            this.stepSound.setVolume(0);
+            this.stepSound.play();
+            this.root.add(this.stepSound);
+        }
+
+        this.breathSound = AudioSystem.getPositionalSound('demon_breathing', 3, 1.0);
+        if (this.breathSound) {
+            this.breathSound.setLoop(true);
+            this.breathSound.play();
+            this.root.add(this.breathSound);
+        }
     }
 
     getMesh() {
@@ -358,6 +372,11 @@ export class Monster {
         } else if (!isMoving && this._animState !== 'idle') {
             this._startIdleAnimation();
         }
+        
+        if (this.stepSound) {
+            this.stepSound.setVolume(isMoving ? 1.0 : 0.0);
+        }
+
         // Aggiorna tutti i tween del gruppo isolato del mostro
         this._tweenGroup.update();
     }

@@ -5,6 +5,7 @@ import { MapEasy } from './src/world/maps/MapEasy.js';
 import { MapMedium } from './src/world/maps/MapMedium.js';
 import { MapHard } from './src/world/maps/MapHard.js';
 import { InteriorAssetManager } from './src/world/InteriorAssetManager.js';
+import { AudioSystem } from './src/core/AudioSystem.js';
 import * as TWEEN from '@tweenjs/tween.js';
 
 // ==========================================
@@ -51,7 +52,10 @@ document.addEventListener('startGameEvent', async (e) => {
 
     try {
         // La mappa si occupa di chiamare InteriorAssetManager.preloadAll() internamente
-        await currentMap.load();
+        await Promise.all([
+            currentMap.load(),
+            AudioSystem.preloadAll()
+        ]);
 
         const collisionBoxes = currentMap.getCollisionBoxes();
         const triggerZones   = currentMap.getTriggerZones();
@@ -67,6 +71,7 @@ document.addEventListener('startGameEvent', async (e) => {
             }
         });
         scene.add(mostroMesh);
+        monster.initAudio();
 
         // Posiziona camera e crea controller
         const playerSpawn = currentMap.getPlayerSpawn();
@@ -79,7 +84,11 @@ document.addEventListener('startGameEvent', async (e) => {
         }
 
         scene.add(camera);
+        camera.add(AudioSystem.listener); // Add listener to camera
         player = new PlayerController(camera, renderer.domElement, collisionBoxes, triggerZones);
+
+        // Start BGM
+        AudioSystem.startBGM();
 
         // Tutto pronto: nascondi loading, mostra istruzioni
         document.dispatchEvent(new Event('assetsLoadedEvent'));
@@ -99,6 +108,7 @@ document.addEventListener('uiTargetChanged', (e) => {
 
 document.addEventListener('itemRaccolto', (e) => {
     console.log('[GIOCO]: Raccolto chiave!');
+    AudioSystem.playSound('pickup');
     scene.remove(e.detail.object);
     if (currentMap) currentMap._goalKeyGroup = null;
     showHudMessage('Chiave raccolta! Torna alla porta dorata.');
@@ -131,6 +141,9 @@ document.addEventListener('portaAperta', (e) => {
                 hinge.userData.closedBoxMax
             );
         }
+        
+        AudioSystem.playPositionalSoundAt('close_door', scene, hinge.position, 10, 1.0);
+        
         const targetY = hinge.userData.startRotationY;
         new TWEEN.Tween(hinge.rotation)
             .to({ y: targetY }, 800)
@@ -143,6 +156,9 @@ document.addEventListener('portaAperta', (e) => {
         if (hinge.userData.collisionBox) {
             hinge.userData.collisionBox.makeEmpty();
         }
+        
+        AudioSystem.playPositionalSoundAt('open_door', scene, hinge.position, 10, 1.0);
+
         const targetY = hinge.userData.startRotationY + (Math.PI / 2);
         new TWEEN.Tween(hinge.rotation)
             .to({ y: targetY }, 800)
@@ -161,6 +177,9 @@ document.addEventListener('portaAperta', (e) => {
 document.addEventListener('portaGoalAperta', (e) => {
     if (currentMap && currentMap._goalDoorBox) currentMap._goalDoorBox.makeEmpty();
     const group = e.detail.object.parent || e.detail.object;
+    
+    AudioSystem.playPositionalSoundAt('door_key', scene, group.position, 10, 1.0);
+    
     new TWEEN.Tween(group.scale)
         .to({ x: 0.001, y: 0.001, z: 0.001 }, 600)
         .easing(TWEEN.Easing.Back.In)
@@ -175,7 +194,10 @@ document.addEventListener('logMessaggioUI', (e) => {
 
 document.addEventListener('horrorTrigger', (e) => {
     console.warn(`[TRIGGER]: Zona: ${e.detail.eventName}`);
-    if (e.detail.eventName === 'GOAL_REACHED') showWinScreen();
+    if (e.detail.eventName === 'GOAL_REACHED') {
+        AudioSystem.playSound('puzzle_solved');
+        showWinScreen();
+    }
 });
 
 function showHudMessage(text) {
@@ -211,7 +233,19 @@ function showWinScreen() {
 
 
 document.addEventListener('playerMorto', () => {
+    AudioSystem.playSound('blood_splash');
     showGameOverScreen();
+});
+
+document.addEventListener('pointerlockchange', () => {
+    if (!player) return;
+    const locked = document.pointerLockElement === document.body
+                || document.pointerLockElement?.tagName === 'CANVAS';
+    if (locked) {
+        AudioSystem.playSound('close_menu');
+    } else {
+        AudioSystem.playSound('open_menu');
+    }
 });
 
 function showGameOverScreen() {
@@ -241,6 +275,13 @@ function animate() {
         const isMoving = player.controls.isLocked
             && distanza <= player.mostroAggroRadius
             && distanza > player.mostroDamageRadius;
+            
+        // Manage BGM state based on distance
+        if (distanza <= player.mostroAggroRadius) {
+            AudioSystem.setBGMState('ambience');
+        } else {
+            AudioSystem.setBGMState('doom');
+        }
 
         monster.update(deltaTime, isMoving);
     }

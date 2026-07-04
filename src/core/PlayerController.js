@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { AudioSystem } from './AudioSystem.js';
 
 export class PlayerController {
     constructor(camera, domElement, collisionObjects, triggerZones) {
@@ -35,6 +36,7 @@ export class PlayerController {
         this.staminaRegenRate = this.maxStamina / 2.0; // Si ricarica totalmente in 2 secondi (2.0 unità al secondo)
         this.staminaDrainRate = 1.0; // Consuma 1 unità al secondo mentre corre
         this.isSprinting = false;
+        this.wasStaminaEmpty = false; // Flag per evitare loop audio
         // ---------------------------
 
         // 3. Stato di Gioco & Logica di Inventario
@@ -202,16 +204,28 @@ export class PlayerController {
             this.isSprinting = true;
             this.moveSpeed = this.sprintMoveSpeed;
             this.stamina -= this.staminaDrainRate * deltaTime; // Consumo
-            if (this.stamina < 0) this.stamina = 0;
+            if (this.stamina <= 0) {
+                this.stamina = 0;
+                if (!this.wasStaminaEmpty) {
+                    this.wasStaminaEmpty = true;
+                    AudioSystem.playSound('strong_breathing');
+                }
+            }
         } else {
             this.isSprinting = false;
             this.moveSpeed = this.baseMoveSpeed;
             // Ricarica solo se non si sta scattando
             if (this.stamina < this.maxStamina) {
                 this.stamina += this.staminaRegenRate * deltaTime; // Ricarica rapida (in 2 secondi)
+                if (this.stamina > 0.5) { // Reset flag when regenerated slightly
+                    this.wasStaminaEmpty = false;
+                }
                 if (this.stamina > this.maxStamina) this.stamina = this.maxStamina;
             }
         }
+        
+        // Update footsteps audio
+        AudioSystem.updatePlayerFootsteps(staMuovendo, this.isSprinting);
 
         // Invia l'evento UI della percentuale di stamina rimasta (0-100)
         const percentualeStamina = (this.stamina / this.maxStamina) * 100;
