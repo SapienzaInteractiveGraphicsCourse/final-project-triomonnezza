@@ -51,6 +51,10 @@ export class MapHard extends MapBase {
             wallDoorTile:'wallDoorBrick.glb',
         };
 
+        // ── Goal door MUST be registered BEFORE build() calls ──────────────────
+        // so that _goalDoorPositions is populated before hinged doors are spawned.
+        this.spawnGoalDoor(-2 + 0.15, 4, Math.PI / 2);
+
         const build = (tx, tz, cols, rows, doors) =>
             this.buildRoomByTiles(tx, tz, cols, rows, doors, BK);
 
@@ -93,9 +97,6 @@ export class MapHard extends MapBase {
         build(19, 3, 6, 1, ['W_0', 'E_0']);               // H13 E→M
         build(26, 8, 1, 8, ['N_0', 'S_0']);               // H24 M→N
         build(18, 17, 6, 1, ['W_0', 'E_0']);              // H25 H→N
-
-        // ── Goal door ──────────────────────────────────────────────────
-        this.spawnGoalDoor(-2 + 0.15, 4, Math.PI / 2);
 
         // Dungeon lamp colour: dim orange torchlight
         const TORCH = 0xff8844;
@@ -521,6 +522,7 @@ export class MapHard extends MapBase {
         this.playerSpawn          = new THREE.Vector3( 4, 1.8,  4);
         this.playerSpawnRotationY = -Math.PI / 2;
         this.monsterSpawn         = new THREE.Vector3( 6, 2.454, 102);
-        this.spawnGoalKey(this.monsterSpawn.clone());
+        // Key in Room I (Monster Lair) SE corner — open floor, no furniture on top
+        this.spawnGoalKey(new THREE.Vector3(12, 1.3, 108));
     }
 }

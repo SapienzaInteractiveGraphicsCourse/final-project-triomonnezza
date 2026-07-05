@@ -246,18 +246,43 @@ export class PlayerController {
         if (this.keys.forward || this.keys.backward) this.velocity.z -= this.direction.z * this.moveSpeed * deltaTime;
         if (this.keys.left || this.keys.right) this.velocity.x -= this.direction.x * this.moveSpeed * deltaTime;
 
-        // 4. Salvataggio Stato Precedente per Rollback in caso di collisione (AABB Boundary Check)
+        // 4. Salvataggio Stato Precedente per Rollback per asse (sliding collision)
         const oldPosition = this.camera.position.clone();
 
         // 5. Attuazione del movimento nello spazio locale della telecamera
         this.controls.moveRight(-this.velocity.x * deltaTime);
         this.controls.moveForward(-this.velocity.z * deltaTime);
 
-        // 6. Verifica Collisioni con l'Ambiente dell'Artista
+        // 6. Verifica Collisioni per asse separato (sliding wall collision)
+        // Instead of a full rollback (which can teleport if oldPosition was already
+        // in a marginal overlap), we test X and Z independently so the player can
+        // slide along walls instead of being snapped to a potentially bad position.
         if (this._checkCollisions()) {
-            this.camera.position.copy(oldPosition); // Ripristino coordinate (Annullamento cinematica)
-            this.velocity.set(0, 0, 0);             // Smorzamento istantaneo energia cinetica
+            // Try keeping Z, rolling back only X
+            const testXBack = oldPosition.clone();
+            testXBack.z = this.camera.position.z;
+            this.camera.position.copy(testXBack);
+            if (this._checkCollisions()) {
+                // X alone didn't help — try keeping X, rolling back only Z
+                const testZBack = new THREE.Vector3(
+                    this.camera.position.x,
+                    oldPosition.y,
+                    oldPosition.z
+                );
+                this.camera.position.copy(testZBack);
+                if (this._checkCollisions()) {
+                    // Both axes collide — full rollback
+                    this.camera.position.copy(oldPosition);
+                } else {
+                    this.velocity.z = 0;
+                }
+            } else {
+                this.velocity.x = 0;
+            }
         }
+
+        // Lock Y to eye-level to prevent vertical drift from numerical imprecision
+        this.camera.position.y = oldPosition.y;
 
         // 7. Esecuzione dei Sottosistemi Ausiliari
         this._updateRaycast();                     // Aggiornamento Sensore Ottico Virtuale
@@ -295,10 +320,29 @@ export class PlayerController {
             const hitObject = intersects[0].object;
 
             if (hitObject.userData && hitObject.userData.isInteractive) {
-                if (this.interactiveObject !== hitObject) {
+                let targetName = 'Interact';
+                const ud = hitObject.userData;
+                if (ud.tipo === 'porta') {
+                    const hinge = hitObject.parentHinge;
+                    if (hinge && hinge.userData.isOpen) {
+                        targetName = 'Close Door';
+                    } else {
+                        targetName = 'Open Door';
+                    }
+                } else if (ud.tipo === 'chiave') {
+                    targetName = 'Pick Up Golden Key';
+                } else if (ud.tipo === 'porta_goal') {
+                    targetName = 'Open Gate';
+                } else if (ud.nome) {
+                    targetName = ud.nome;
+                } else if (hitObject.name && !hitObject.name.match(/^(Cube|Object|Mesh|Material)/i)) {
+                    targetName = hitObject.name;
+                }
+
+                if (this.interactiveObject !== hitObject || this._lastTargetName !== targetName) {
                     this.interactiveObject = hitObject;
-                    // Evento UI per l'Artista (es. mostra il mirino "Raccogli/Apri")
-                    this._dispatchGlobalEvent('uiTargetChanged', { name: this.interactiveObject.name });
+                    this._lastTargetName = targetName;
+                    this._dispatchGlobalEvent('uiTargetChanged', { name: targetName });
                 }
                 return;
             }
@@ -351,7 +395,7 @@ export class PlayerController {
         // Sotto-logica 2: Porta del Goal (richiede chiave dorata)
         if (objData.tipo === 'porta_goal') {
             if (!this.inventario.has('chiave_goal')) {
-                this._dispatchGlobalEvent('logMessaggioUI', { testo: '🔒 Trova la chiave dorata per aprire questa porta!' });
+                this._dispatchGlobalEvent('logMessaggioUI', { testo: 'The exit door is locked. Find the Golden Key!' });
                 return;
             }
             this._dispatchGlobalEvent('portaGoalAperta', { object: this.interactiveObject });
@@ -362,7 +406,7 @@ export class PlayerController {
         // Sotto-logica 3: Controllo Accessi (Porte normali bloccate)
         if (objData.tipo === 'porta') {
             if (objData.richiedeChiave && !this.inventario.has(objData.idChiave)) {
-                this._dispatchGlobalEvent('logMessaggioUI', { testo: "La porta è serrata dall'interno. Serve una chiave." });
+                this._dispatchGlobalEvent('logMessaggioUI', { testo: "The door is locked from the inside. You need a key." });
                 return;
             }
 

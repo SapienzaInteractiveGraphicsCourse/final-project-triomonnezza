@@ -630,6 +630,10 @@ export class MapBase {
         // Register this position so no hinged door is placed here
         this._goalDoorPositions.push({ x, z });
 
+        const panelMat = new THREE.MeshStandardMaterial({
+            color: 0xFFD700, metalness: 1.0, roughness: 0.08,
+            emissive: 0xCC8800, emissiveIntensity: 0.5,
+        });
         const frameMat = new THREE.MeshStandardMaterial({
             color: 0xFFD700, metalness: 1.0, roughness: 0.08,
             emissive: 0xCC8800, emissiveIntensity: 0.5,
@@ -638,7 +642,25 @@ export class MapBase {
 
         const group = new THREE.Group();
 
-        // ── Cornice dorata (no dark panel — just the golden arch) ──────────────
+        // ── Pannello solido golden — blocca la vista, tutto dorato ────────────
+        // Full-width, full-height solid golden panel that fills the doorway opening
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(2.5, 4.5, 0.18), panelMat);
+        panel.position.set(0, 0, -0.02); // slightly behind the frame
+        group.add(panel);
+
+        // ── Rilievi decorativi — 3 barre orizzontali in rilievo sul pannello ──
+        const barMat = new THREE.MeshStandardMaterial({
+            color: 0xFFE040, metalness: 1.0, roughness: 0.06,
+            emissive: 0xCC8800, emissiveIntensity: 0.6,
+        });
+        const barGeo = new THREE.BoxGeometry(2.2, 0.08, 0.10);
+        [-1.4, 0, 1.4].forEach(y => {
+            const bar = new THREE.Mesh(barGeo, barMat);
+            bar.position.set(0, y, 0.06);
+            group.add(bar);
+        });
+
+        // ── Cornice dorata — rendered in front of the panel ──────────────────
         const fH = new THREE.Mesh(new THREE.BoxGeometry(2.68, 0.18, 0.22), frameMat);
         const fTop = fH.clone(); fTop.position.y =  2.12; group.add(fTop);
         const fBot = fH.clone(); fBot.position.y = -2.12; group.add(fBot);

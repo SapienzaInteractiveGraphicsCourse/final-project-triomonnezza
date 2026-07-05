@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horror Sandbox - Test PlayerController</title>
-    <!-- Prevent favicon 404 error -->
-    <link rel="icon" href="data:image/x-icon;base64,">
+    <title>Echoes in the Dark</title>
+    <link rel="icon" type="image/x-icon" href="assets/horror-game.ico">
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -17,7 +16,7 @@
             --bone-dim: #777777;
             --gold: #ccaa00;
             --gold-glow: rgba(204, 170, 0, 0.5);
-            --stamina-full: rgba(150, 150, 150, 1);
+            --stamina-full: rgba(0, 180, 0, 1); /* Green */
             --stamina-empty: rgba(153, 0, 0, 1);
         }
 
@@ -118,6 +117,28 @@
             width: 48px;
             height: 48px;
             image-rendering: pixelated;
+        }
+
+        /* ── Interaction Prompt (PSX Style) ── */
+        #interaction-prompt {
+            position: absolute;
+            top: calc(50% + 40px);
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--bone);
+            font-size: 1.8rem;
+            text-align: center;
+            pointer-events: none;
+            z-index: 5;
+            background: rgba(0,0,0,0.8);
+            border: 2px solid #333;
+            padding: 8px 16px;
+            box-shadow: 4px 4px 0 #000;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+        #interaction-prompt.show {
+            opacity: 1;
         }
 
         /* ── HUD Messages (Blocky) ── */
@@ -328,7 +349,7 @@
 
     <div id="main-menu" class="overlay-screen">
         <div class="title-container">
-            <h1 class="glitch-text" data-text="TRIO MONNEZZA">TRIO MONNEZZA</h1>
+            <h1 class="glitch-text" data-text="ECHOES IN THE DARK">ECHOES IN THE DARK</h1>
             <p class="subtitle">Descent into Madness</p>
         </div>
         <div class="menu-buttons">
@@ -366,19 +387,17 @@
 
     <div id="gameover-overlay" class="overlay-screen" style="display: none; background: rgba(5, 0, 0, 0.95); z-index: 9999;">
         <div class="title-container">
-            <div style="font-size:6rem;color:var(--crimson);margin-bottom:10px;text-shadow:4px 4px 0 #000">☠</div>
-            <h1 class="glitch-text" data-text="SEI MORTO" style="text-shadow: 4px 4px 0 var(--crimson);">SEI MORTO</h1>
-            <p class="subtitle">La bestia ha preteso un'altra anima</p>
+            <h1 class="glitch-text" data-text="YOU DIED" style="text-shadow: 4px 4px 0 var(--crimson);">YOU DIED</h1>
+            <p class="subtitle">The beast has claimed another soul</p>
         </div>
         <div class="menu-buttons" style="margin-top: 20px;">
-            <button class="diff-btn restart-btn" onclick="location.href='?diff=' + (window.currentDifficulty || 'easy')">RIPROVA</button>
-            <button class="diff-btn mainmenu-btn" onclick="location.href='index.html'">MENU PRINCIPALE</button>
+            <button class="diff-btn restart-btn" onclick="location.href='?diff=' + (window.currentDifficulty || 'easy')">RETRY</button>
+            <button class="diff-btn mainmenu-btn" onclick="location.href='index.html'">MAIN MENU</button>
         </div>
     </div>
 
     <div id="win-overlay" class="overlay-screen" style="display: none; background: rgba(0, 0, 0, 0.95); z-index: 9999;">
         <div class="title-container">
-            <div style="font-size:5rem;margin-bottom:20px;text-shadow:4px 4px 0 var(--gold)">🔑🚪</div>
             <h1 class="glitch-text" data-text="ESCAPED" style="color: var(--gold); text-shadow: 4px 4px 0 #000;">ESCAPED</h1>
             <p class="subtitle" style="color: var(--bone);">You have unlocked the nightmare.</p>
         </div>
@@ -388,6 +407,7 @@
     </div>
 
     <div id="crosshair"></div>
+    <div id="interaction-prompt"></div>
 
     <div id="stamina-container">
         <div id="stamina-bar"></div>
@@ -487,9 +507,17 @@
             }
         });
 
-        // ── Mirino ──────────────────────────────────────────────────
+        // ── Mirino & PSX Prompt ─────────────────────────────────────
+        const interactionPrompt = document.getElementById('interaction-prompt');
         document.addEventListener('uiTargetChanged', (e) => {
-            crosshair.classList.toggle('active', !!e.detail.name);
+            const name = e.detail.name;
+            crosshair.classList.toggle('active', !!name);
+            if (name) {
+                interactionPrompt.innerText = '[E] ' + name;
+                interactionPrompt.classList.add('show');
+            } else {
+                interactionPrompt.classList.remove('show');
+            }
         });
 
         // ── Messaggi HUD ────────────────────────────────────────────

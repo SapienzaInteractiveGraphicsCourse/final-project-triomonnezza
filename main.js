@@ -111,7 +111,7 @@ document.addEventListener('itemRaccolto', (e) => {
     AudioSystem.playSound('pickup');
     scene.remove(e.detail.object);
     if (currentMap) currentMap._goalKeyGroup = null;
-    showHudMessage('Chiave raccolta! Torna alla porta dorata.');
+    document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: 'Key collected! Return to the golden door.' } }));
     if (e.detail.idChiave === 'chiave_goal') {
         const keyHud = document.getElementById('key-hud');
         if (keyHud) keyHud.style.display = 'flex';
@@ -177,19 +177,19 @@ document.addEventListener('portaAperta', (e) => {
 document.addEventListener('portaGoalAperta', (e) => {
     if (currentMap && currentMap._goalDoorBox) currentMap._goalDoorBox.makeEmpty();
     const group = e.detail.object.parent || e.detail.object;
-    
+
+    // Lock player movement immediately — prevents walking into void through
+    // the now-collision-free gap in the wall during the win animation.
+    if (player) player.controls.unlock();
+
     AudioSystem.playPositionalSoundAt('door_key', scene, group.position, 10, 1.0);
-    
+
     new TWEEN.Tween(group.scale)
         .to({ x: 0.001, y: 0.001, z: 0.001 }, 600)
         .easing(TWEEN.Easing.Back.In)
         .onComplete(() => { scene.remove(group); setTimeout(showWinScreen, 400); })
         .start();
-    showHudMessage('La porta si apre... Sei libero!');
-});
-
-document.addEventListener('logMessaggioUI', (e) => {
-    showHudMessage(e.detail.testo);
+    document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: 'The door opens... You are free!' } }));
 });
 
 document.addEventListener('horrorTrigger', (e) => {
@@ -200,28 +200,6 @@ document.addEventListener('horrorTrigger', (e) => {
     }
 });
 
-function showHudMessage(text) {
-    let hud = document.getElementById('hud-message');
-    if (!hud) {
-        hud = document.createElement('div');
-        hud.id = 'hud-message';
-        Object.assign(hud.style, {
-            position: 'fixed', bottom: '80px', left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(0,0,0,0.78)', color: '#FFD700',
-            padding: '10px 24px', borderRadius: '8px',
-            fontFamily: 'monospace', fontSize: '16px',
-            border: '1px solid rgba(255,215,0,0.5)',
-            pointerEvents: 'none', zIndex: '999',
-            opacity: '0', transition: 'opacity 0.3s',
-        });
-        document.body.appendChild(hud);
-    }
-    hud.textContent = text;
-    hud.style.opacity = '1';
-    clearTimeout(hud._timeout);
-    hud._timeout = setTimeout(() => { hud.style.opacity = '0'; }, 3500);
-}
 
 function showWinScreen() {
     if (player) player.controls.unlock();
@@ -264,7 +242,10 @@ const clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate);
     TWEEN.update();
-    const deltaTime = clock.getDelta();
+    // Clamp deltaTime to 100 ms max — large spikes (tab switch, lag) would cause
+    // the player and monster to take huge movement steps that bypass collision
+    // detection, resulting in teleportation outside the map.
+    const deltaTime = Math.min(clock.getDelta(), 0.1);
 
     if (player && mostroMesh) {
         player.update(deltaTime, mostroMesh);
@@ -287,7 +268,7 @@ function animate() {
     }
 
     if (currentMap && currentMap.update) {
-        currentMap.update(deltaTime);
+        currentMap.update(deltaTime, camera);
     }
 
     renderer.render(scene, camera);

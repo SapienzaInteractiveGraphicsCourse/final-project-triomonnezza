@@ -33,6 +33,10 @@ export class MapEasy extends MapBase {
             wallTile:   'wallWallpaper.glb',
         };
 
+        // ── Goal door MUST be registered BEFORE build() calls ──────────────────
+        // so that _goalDoorPositions is populated before hinged doors are spawned.
+        this.spawnGoalDoor(20, 30 - 0.15, Math.PI);
+
         const build = (tx, tz, cols, rows, doors) =>
             this.buildRoomByTiles(tx, tz, cols, rows, doors, WP);
 
@@ -213,13 +217,12 @@ export class MapEasy extends MapBase {
         // H6 (B ↔ E) — cx=34, cz=16  bounds x[30,38] z[14,22]
         this.spawnCeilingLamp(34, 18, 5.5, 0.6, 7, 0xffeedd, true);
 
-        // ── Goal door: South wall of Room C ────────────────────────────
-        this.spawnGoalDoor(20, 30 - 0.15, Math.PI);
 
         // ── Spawns ─────────────────────────────────────────────────────
         this.playerSpawn          = new THREE.Vector3( 6, 1.8,  4);
         this.playerSpawnRotationY = Math.PI / 2;
         this.monsterSpawn         = new THREE.Vector3(30, 2.454, 6);
-        this.spawnGoalKey(this.monsterSpawn.clone());
+        // Key in Room B (Kitchen) SE corner — open floor, no furniture on top
+        this.spawnGoalKey(new THREE.Vector3(35, 1.3, 12));
     }
 }

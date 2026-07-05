@@ -31,11 +31,15 @@ export class MapMedium extends MapBase {
             wallDoorTile:'wallDoorPlaster.glb',
         };
 
+        // ── Goal door MUST be registered BEFORE build() calls ──────────────────
+        // so that _goalDoorPositions is populated before hinged doors are spawned.
+        this.spawnGoalDoor(-2 + 0.15, 6, Math.PI / 2);
+
         const build = (tx, tz, cols, rows, doors) =>
             this.buildRoomByTiles(tx, tz, cols, rows, doors, TM);
 
         // Massive Halls (4×4)
-        build(0, 0, 4, 4, ['E_1', 'S_2', 'W_1']);                     // R_A
+        build(0, 0, 4, 4, ['E_1', 'S_2']);                            // R_A (Removed W_1 which points outside)
         build(12, 0, 4, 4, ['W_1', 'S_2']);                            // R_B
         build(6, 10, 4, 4, ['N_2', 'W_1', 'E_1', 'S_0', 'S_3']);      // R_C
 
@@ -57,9 +61,6 @@ export class MapMedium extends MapBase {
         build(6, 14, 1, 2, ['N_0', 'S_0']);                            // H_C_down1
         build(9, 14, 1, 2, ['N_0', 'S_0']);                            // H_C_down2
         build(7, 16, 2, 1, ['W_0', 'E_0']);                            // H_back
-
-        // ── Goal door ─────────────────────────────────────────────────
-        this.spawnGoalDoor(-2 + 0.15, 6, Math.PI / 2);
 
         // ═══════════════════════════════════════════════════════════════
         // ROOM A — WAITING ROOM
@@ -258,6 +259,7 @@ export class MapMedium extends MapBase {
         this.playerSpawn          = new THREE.Vector3( 6, 1.8,  4);
         this.playerSpawnRotationY = -Math.PI / 2;
         this.monsterSpawn         = new THREE.Vector3(30, 2.454, 46);
-        this.spawnGoalKey(this.monsterSpawn.clone());
+        // Key in Room C (Staff Room) SW corner — open floor, no furniture on top
+        this.spawnGoalKey(new THREE.Vector3(26, 1.3, 52));
     }
 }
