@@ -14,6 +14,8 @@ export class MapBase {
         // Tracks world positions of already-spawned doors to prevent
         // duplicate doors when two adjacent rooms both declare the same doorway.
         this._spawnedDoorKeys = new Set();
+        // World-space XZ positions of goal doors — hinged doors are NOT placed here.
+        this._goalDoorPositions = [];
     }
 
     getMeshFromManager(filename) {
@@ -283,6 +285,12 @@ export class MapBase {
 
 
         const spawnInteractiveDoor = (x, y, z, rotationY) => {
+            // ── Skip if a goal door occupies this position ──────────────────────
+            const GOAL_MERGE_DIST = 1.5;
+            for (const gp of this._goalDoorPositions) {
+                if (Math.abs(gp.x - x) < GOAL_MERGE_DIST && Math.abs(gp.z - z) < GOAL_MERGE_DIST) return;
+            }
+
             const mesh = InteriorAssetManager.get('low_poly_psx_hinged_door.glb');
             if (!mesh) return;
 
@@ -619,28 +627,26 @@ export class MapBase {
      * @param {number} rotationY  0=N, PI=S, PI/2=E, -PI/2=W (facing into room)
      */
     spawnGoalDoor(x, z, rotationY = 0) {
-        const doorMat  = new THREE.MeshStandardMaterial({ color: 0x2A1200, metalness: 0.1, roughness: 0.8 });
+        // Register this position so no hinged door is placed here
+        this._goalDoorPositions.push({ x, z });
+
         const frameMat = new THREE.MeshStandardMaterial({
-            color: 0xFFD700, metalness: 1.0, roughness: 0.1,
-            emissive: 0xCC8800, emissiveIntensity: 0.35,
+            color: 0xFFD700, metalness: 1.0, roughness: 0.08,
+            emissive: 0xCC8800, emissiveIntensity: 0.5,
         });
-        const lockMat  = new THREE.MeshStandardMaterial({ color: 0xCC7700, metalness: 1.0, roughness: 0.15 });
+        const lockMat  = new THREE.MeshStandardMaterial({ color: 0xCC7700, metalness: 1.0, roughness: 0.12 });
 
         const group = new THREE.Group();
 
-        // Pannello porta
-        const panel = new THREE.Mesh(new THREE.BoxGeometry(2.2, 4.0, 0.14), doorMat);
-        group.add(panel);
-
-        // Cornice dorata
-        const fH = new THREE.Mesh(new THREE.BoxGeometry(2.68, 0.15, 0.22), frameMat);
+        // ── Cornice dorata (no dark panel — just the golden arch) ──────────────
+        const fH = new THREE.Mesh(new THREE.BoxGeometry(2.68, 0.18, 0.22), frameMat);
         const fTop = fH.clone(); fTop.position.y =  2.12; group.add(fTop);
         const fBot = fH.clone(); fBot.position.y = -2.12; group.add(fBot);
-        const fV = new THREE.Mesh(new THREE.BoxGeometry(0.15, 4.32, 0.22), frameMat);
-        const fL = fV.clone(); fL.position.x = -1.22; group.add(fL);
-        const fR = fV.clone(); fR.position.x =  1.22; group.add(fR);
+        const fV = new THREE.Mesh(new THREE.BoxGeometry(0.18, 4.5, 0.22), frameMat);
+        const fL = fV.clone(); fL.position.x = -1.25; group.add(fL);
+        const fR = fV.clone(); fR.position.x =  1.25; group.add(fR);
 
-        // Lucchetto corpo
+        // ── Lucchetto corpo ────────────────────────────────────────────────────
         const lockBody = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.34, 0.24), lockMat);
         lockBody.position.set(0.55, 0, 0.14);
         group.add(lockBody);
@@ -651,16 +657,24 @@ export class MapBase {
         shackle.position.set(0.55, 0.24, 0.14);
         group.add(shackle);
 
-        // Glow dorato sulla porta
-        const glow = new THREE.PointLight(0xFFAA00, 3.0, 7);
-        glow.position.set(0, 0, 1.0);
-        group.add(glow);
+        // ── Glow dorato base (sempre attivo, ma tenue) ─────────────────────────
+        const baseGlow = new THREE.PointLight(0xFFAA00, 1.5, 5);
+        baseGlow.position.set(0, 0, 0.8);
+        group.add(baseGlow);
+
+        // ── Aura reattiva alla torcia (si illumina quando il giocatore punta la torcia) ──
+        // A second, stronger light that is boosted via onBeforeRender when the
+        // flashlight cone intersects this door's position.
+        const flashAura = new THREE.PointLight(0xFFD700, 0, 8);
+        flashAura.position.set(0, 0, 0.6);
+        group.add(flashAura);
+        this._goalDoorFlashAura = flashAura;
 
         group.position.set(x, 2.25, z);
         group.rotation.y = rotationY;
         group.updateMatrixWorld(true);
 
-        // Interattività
+        // ── Interattività ──────────────────────────────────────────────────────
         group.traverse(child => {
             if (child.isMesh) {
                 child.userData = {
@@ -681,7 +695,13 @@ export class MapBase {
         return group;
     }
 
-    update(deltaTime) {
+    /**
+     * Called every frame by main.js.
+     * @param {number} deltaTime
+     * @param {THREE.Camera|null} camera  Pass the player camera so the flashlight
+     *                                     aura on the goal door can react to it.
+     */
+    update(deltaTime, camera = null) {
         // Flicker luci corridoio
         for (const obj of this.flickeringLights) {
             obj.timer -= deltaTime;
@@ -705,6 +725,43 @@ export class MapBase {
             this._goalKeyTime = (this._goalKeyTime || 0) + deltaTime;
             this._goalKeyGroup.rotation.y = this._goalKeyTime * 2.0;
             this._goalKeyGroup.position.y = 1.3 + Math.sin(this._goalKeyTime * 2.2) * 0.12;
+        }
+
+        // ── Aura reattiva alla torcia sulla porta del goal ────────────────────
+        // When the player's flashlight (SpotLight attached to camera) is aimed
+        // within ~30° of the goal door, boost the golden aura intensity sharply.
+        if (this._goalDoorFlashAura && this._goalDoorGroup && camera) {
+            const doorWorldPos = new THREE.Vector3();
+            this._goalDoorGroup.getWorldPosition(doorWorldPos);
+
+            // Vector from camera to door
+            const toDoor = new THREE.Vector3().subVectors(doorWorldPos, camera.position);
+            const distToDoor = toDoor.length();
+
+            if (distToDoor < 30) {
+                toDoor.normalize();
+
+                // Camera forward direction in world space
+                const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+
+                // Dot product: 1 = looking directly at door, 0 = perpendicular
+                const dot = camForward.dot(toDoor);
+
+                // Flashlight cone is PI/4 half-angle → cos(PI/4) ≈ 0.707
+                // We start the aura boost a bit earlier (dot > 0.6) and max at dot > 0.85
+                const auraTarget = dot > 0.6
+                    ? THREE.MathUtils.mapLinear(dot, 0.6, 0.95, 0, 12)
+                    : 0;
+
+                // Smooth transition
+                this._goalDoorFlashAura.intensity = THREE.MathUtils.lerp(
+                    this._goalDoorFlashAura.intensity, auraTarget, Math.min(1, deltaTime * 6)
+                );
+            } else {
+                this._goalDoorFlashAura.intensity = THREE.MathUtils.lerp(
+                    this._goalDoorFlashAura.intensity, 0, Math.min(1, deltaTime * 4)
+                );
+            }
         }
     }
 
