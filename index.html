@@ -77,6 +77,23 @@
             border: 2px solid var(--void);
         }
 
+        /* ── HUD Torcia (Regista) ── */
+        #torch-battery-hud {
+            position: absolute;
+            bottom: 62px;
+            left: 40px;
+            width: 250px;
+            font-size: 1.1rem;
+            color: var(--bone);
+            text-shadow: 1px 1px 0 #000;
+            z-index: 10;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+        #torch-battery-hud.low {
+            color: var(--crimson);
+        }
+
         /* ── HUD Stamina (Blocky PSX style) ── */
         #stamina-container {
             position: absolute;
@@ -412,6 +429,7 @@
     <div id="crosshair"></div>
     <div id="interaction-prompt"></div>
 
+    <div id="torch-battery-hud">🔦 100%</div>
     <div id="stamina-container">
         <div id="stamina-bar"></div>
     </div>
@@ -429,6 +447,7 @@
         const crosshair       = document.getElementById('crosshair');
         const hudMessages     = document.getElementById('hud-messages');
         const staminaBar      = document.getElementById('stamina-bar');
+        const torchBatteryHud = document.getElementById('torch-battery-hud');
         const mainMenu        = document.getElementById('main-menu');
         const loadingScreen   = document.getElementById('loading-screen');
         const loadingBarFill  = document.getElementById('loading-bar-fill');
@@ -508,6 +527,23 @@
             } else {
                 staminaBar.style.backgroundColor = 'var(--stamina-full)';
             }
+        });
+
+        // ── HUD Batteria Torcia (Regista) ────────────────────────────
+        // Riusa lo stesso evento 'torciaScarica' già consumato dal
+        // TweenManager per l'effetto luce; qui ci limitiamo a scrivere il
+        // testo, nessuna interferenza con l'animazione della luce stessa.
+        document.addEventListener('torciaScarica', (e) => {
+            const pct = e.detail.percent;
+            if (pct === undefined) return;
+            torchBatteryHud.textContent = `🔦 ${pct}%`;
+            torchBatteryHud.classList.toggle('low', pct <= 40);
+        });
+
+        // Reset del testo ad ogni nuova partita/restart
+        document.addEventListener('startGameEvent', () => {
+            torchBatteryHud.textContent = '🔦 100%';
+            torchBatteryHud.classList.remove('low');
         });
 
         // ── Mirino & PSX Prompt ─────────────────────────────────────

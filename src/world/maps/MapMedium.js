@@ -255,6 +255,10 @@ export class MapMedium extends MapBase {
         // H4_horiz (4 tiles E-W): x[38,54] z[42,46]
         this.spawnCeilingLamp(46, 44, 5.5, 0.5, 8, 0xfff4cc, true);
 
+        // ── Trigger horror (Regista) ──────────────────────────────────
+        // J_1 closet, cx=34 cz=6 — jumpscare quando il giocatore ci passa vicino
+        this.addTrigger(34, 2, 6, 'CLOSET_SCARE');
+
         // ── Spawns ─────────────────────────────────────────────────────
         this.playerSpawn          = new THREE.Vector3( 6, 1.8,  4);
         this.playerSpawnRotationY = -Math.PI / 2;

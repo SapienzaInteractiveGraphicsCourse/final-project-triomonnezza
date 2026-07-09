@@ -2,52 +2,57 @@
  * MonsterAnimator.js  —  Animazioni Gerarchiche del Mostro
  * RESPONSABILE: Federico (Regista)
  *
- * Gestisce tutte le animazioni del modello gerarchico del mostro
- * implementate via JavaScript (requisito del prof: NO animazioni importate).
+ * Facciata pubblica sulle animazioni procedurali del mostro. L'implementazione
+ * effettiva dei Tween vive dentro Monster.js (_startWalkAnimation,
+ * _startIdleAnimation, attack) perché il mostro possiede il proprio
+ * TWEEN.Group isolato: ogni cambio di stato deve poter interrompere e
+ * riavviare in modo pulito le proprie animazioni senza toccare gli altri
+ * tween della scena (porte, oggetti, jumpscare). Questa classe espone
+ * un'interfaccia semplice e nominata in italiano (come da specifica) per
+ * chi vuole pilotare le animazioni del mostro dall'esterno senza conoscere
+ * i dettagli implementativi di Monster.js.
  *
- * ANIMAZIONI DA IMPLEMENTARE:
- *   - camminata(): oscillazione braccia e corpo durante l'inseguimento
- *   - attacco():   movimento rapido delle braccia verso il giocatore
- *   - idle():      leggero dondolamento in stato di pattuglia
- *
- * TODO Federico: usa tween.js per interpolare le rotazioni dei joints.
+ * ANIMAZIONI:
+ *   - camminata(): oscillazione braccia/gambe/testa durante l'inseguimento
+ *   - attacco():   scatto rapido delle braccia/artigli verso il giocatore
+ *   - idle():      leggero dondolamento/respiro in stato di pattuglia
  */
 
 export class MonsterAnimator {
     /**
-     * @param {Monster} monster  - istanza di src/entities/Monster.js
-     * @param {object}  TWEEN    - libreria tween.js
+     * @param {import('../entities/Monster.js').Monster} monster - istanza del mostro
+     * @param {object} TWEEN - libreria tween.js (non usata direttamente qui,
+     *                          mantenuta nella firma per compatibilità con
+     *                          l'interfaccia storica e per eventuali estensioni
+     *                          future che animino oggetti esterni al mostro)
      */
     constructor(monster, TWEEN) {
         this.monster = monster;
         this.TWEEN   = TWEEN;
-        this._currentAnim = null;
     }
 
-    /** Avvia l'animazione di camminata (loop) */
+    /** Avvia l'animazione di camminata (loop ping-pong su braccia/gambe/testa) */
     camminata() {
-        // TODO Federico: Tween ciclico sulle rotazioni di braccioSx e braccioDx
-        // Suggerimento: usa TWEEN.Tween con onComplete che richiama se stesso (ping-pong)
-        console.warn('[MonsterAnimator] camminata() → TODO');
+        this.monster._startWalkAnimation();
     }
 
-    /** Animazione di attacco (one-shot, poi torna a camminata) */
+    /** Animazione di attacco (one-shot, poi il mostro torna a camminata/idle) */
     attacco() {
-        // TODO Federico
-        console.warn('[MonsterAnimator] attacco() → TODO');
+        this.monster.attack();
     }
 
-    /** Animazione idle (dondolamento lento) */
+    /** Animazione idle (dondolamento/respiro lento) */
     idle() {
-        // TODO Federico
-        console.warn('[MonsterAnimator] idle() → TODO');
+        this.monster._startIdleAnimation();
     }
 
-    /** Ferma tutte le animazioni in corso */
+    /** Stato animazione corrente del mostro ('walk' | 'idle' | 'attack' | null) */
+    getState() {
+        return this.monster.getAnimState();
+    }
+
+    /** Ferma tutte le animazioni in corso sul mostro */
     stop() {
-        if (this._currentAnim) {
-            this._currentAnim.stop();
-            this._currentAnim = null;
-        }
+        this.monster._stopAllTweens();
     }
 }

@@ -359,6 +359,72 @@ export class Monster {
     }
 
     /**
+     * Animazione di ATTACCO (one-shot): il mostro scatta in avanti con le
+     * braccia/artigli tesi verso il giocatore, poi torna in stato neutro.
+     * Chiamata da main.js sull'evento 'playerMorto' — è il "colpo di grazia"
+     * che il giocatore vede subito prima della schermata di Game Over.
+     *
+     * Durante l'attacco lo stato animazione viene bloccato su 'attack' cosicché
+     * update() non lo sovrascriva a metà mentre i tween sono ancora attivi.
+     */
+    attack() {
+        this._stopAllTweens();
+        this._animState = 'attack';
+
+        const lungeDur = 140; // scatto rapido e brutale, non un movimento fluido
+
+        // Le braccia scattano in avanti/alto come per colpire
+        new TWEEN.Tween(this.braccioSx.rotation, this._tweenGroup)
+            .to({ x: -1.35 }, lungeDur)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .start();
+        new TWEEN.Tween(this.braccioDx.rotation, this._tweenGroup)
+            .to({ x: -1.35 }, lungeDur)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .start();
+
+        // Gli avambracci si distendono (artigli in avanti)
+        new TWEEN.Tween(this.avanbraccioSx.rotation, this._tweenGroup)
+            .to({ x: -0.85 }, lungeDur)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .start();
+        new TWEEN.Tween(this.avanbraccioDx.rotation, this._tweenGroup)
+            .to({ x: -0.85 }, lungeDur)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .start();
+
+        // Il busto e la testa si proiettano in avanti (yoyo: scatta e ritorna)
+        new TWEEN.Tween(this.corpo.position, this._tweenGroup)
+            .to({ z: -0.4 }, lungeDur)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .yoyo(true).repeat(1)
+            .start();
+
+        new TWEEN.Tween(this.testa.position, this._tweenGroup)
+            .to({ z: -0.4 }, lungeDur)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .yoyo(true).repeat(1)
+            .onComplete(() => {
+                // Rilascia il lock di stato: il prossimo update() potrà
+                // riportare il mostro in idle/walk normalmente.
+                this._animState = null;
+            })
+            .start();
+
+        // Testa: scatto rotazionale rabbioso verso il basso (per "mordere")
+        new TWEEN.Tween(this.testa.rotation, this._tweenGroup)
+            .to({ x: 0.5 }, lungeDur)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .yoyo(true).repeat(1)
+            .start();
+    }
+
+    /** Stato animazione corrente ('walk' | 'idle' | 'attack' | null) */
+    getAnimState() {
+        return this._animState;
+    }
+
+    /**
      * update(deltaTime, isMoving)
      * Va chiamato ogni frame dal game loop in main.js.
      * Cambia stato animazione solo quando necessario (evita restart continui).
@@ -367,12 +433,15 @@ export class Monster {
      * @param {boolean} isMoving  - true se il mostro sta inseguendo il player
      */
     update(deltaTime, isMoving) {
-        if (isMoving && this._animState !== 'walk') {
-            this._startWalkAnimation();
-        } else if (!isMoving && this._animState !== 'idle') {
-            this._startIdleAnimation();
+        // Non interrompere un'animazione di attacco già in corso
+        if (this._animState !== 'attack') {
+            if (isMoving && this._animState !== 'walk') {
+                this._startWalkAnimation();
+            } else if (!isMoving && this._animState !== 'idle') {
+                this._startIdleAnimation();
+            }
         }
-        
+
         if (this.stepSound) {
             this.stepSound.setVolume(isMoving ? 1.0 : 0.0);
         }

@@ -518,6 +518,10 @@ export class MapHard extends MapBase {
         this.spawnCeilingLamp(78, 74, 5.5, 0.4, 8, TORCH_DIM, true);
         this.spawnCeilingLamp(90, 74, 5.5, 0.4, 8, TORCH_DIM);
 
+        // ── Trigger horror (Regista) ──────────────────────────────────
+        // J: Antechamber to the lair, cx=58 cz=106 — ultimo jumpscare prima della tana
+        this.addTrigger(58, 2, 106, 'ANTECHAMBER_SCARE');
+
         // ── Spawns ─────────────────────────────────────────────────────
         this.playerSpawn          = new THREE.Vector3( 4, 1.8,  4);
         this.playerSpawnRotationY = -Math.PI / 2;

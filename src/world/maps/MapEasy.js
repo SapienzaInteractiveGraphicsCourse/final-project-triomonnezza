@@ -218,6 +218,10 @@ export class MapEasy extends MapBase {
         this.spawnCeilingLamp(34, 18, 5.5, 0.6, 7, 0xffeedd, true);
 
 
+        // ── Trigger horror (Regista) ──────────────────────────────────
+        // Room D (Storage/Hallway closet), cx=4 cz=28 — jumpscare al primo ingresso
+        this.addTrigger(4, 2, 28, 'STORAGE_SCARE');
+
         // ── Spawns ─────────────────────────────────────────────────────
         this.playerSpawn          = new THREE.Vector3( 6, 1.8,  4);
         this.playerSpawnRotationY = Math.PI / 2;
