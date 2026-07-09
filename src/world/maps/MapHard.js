@@ -528,5 +528,12 @@ export class MapHard extends MapBase {
         this.monsterSpawn         = new THREE.Vector3( 6, 2.454, 102);
         // Key in Room I (Monster Lair) SE corner — open floor, no furniture on top
         this.spawnGoalKey(new THREE.Vector3(12, 1.3, 108));
+
+        // ── Batterie di ricarica torcia (Regista) ─────────────────────
+        // 3 batterie su Hard, ben distribuite lungo il percorso: vicino
+        // all'ingresso (B), a metà mappa (F) e verso il fondo (G)
+        this.spawnBattery(new THREE.Vector3(34, 0, 6),  'batteria_hard_1');
+        this.spawnBattery(new THREE.Vector3(68, 0, 52), 'batteria_hard_2');
+        this.spawnBattery(new THREE.Vector3(8,  0, 72), 'batteria_hard_3');
     }
 }

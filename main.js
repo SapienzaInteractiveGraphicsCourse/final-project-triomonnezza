@@ -41,9 +41,12 @@ const monster = new Monster();
 // ── Batteria torcia (Regista) ─────────────────────────────────────
 // Si scarica gradualmente nel tempo fino a un minimo (mai si spegne del
 // tutto). Implementata come moltiplicatore applicato SOPRA l'intensità
-// che PlayerController calcola ogni frame (incluso il suo sfarfallio casuale)
+// che PlayerController calcola ogni frame (incluso il suo sfarfallio
+// casuale) — MAI scrivendo light.intensity direttamente da qui, altrimenti
+// i due sistemi si sovrascriverebbero a vicenda in modo imprevedibile
+// (stesso tipo di conflitto già visto con la camera).
 const TORCH_BATTERY_MIN_PERCENT = 30;  // percentuale minima di luce residua
-const TORCH_DRAIN_INTERVAL_SEC  = 1;   // ogni quanti secondi perde l'1%
+const TORCH_DRAIN_INTERVAL_SEC  = 1;   // ogni quanti secondi perde l'1% (valore di test scelto dall'utente)
 let torchBatteryPercent = 100;
 let _torchDrainTimer = 0;
 const _torchBatteryMult = { mult: 1.0 }; // valore animato in tween, applicato ogni frame
@@ -53,6 +56,32 @@ const _torchBatteryMult = { mult: 1.0 }; // valore animato in tween, applicato o
 // NB: passiamo il canvas (per lo screen-shake CSS), MAI la camera —
 // vedi nota in TweenManager.js sul conflitto con PointerLockControls.
 const tweenManager = new TweenManager(TWEEN, { scene, canvas: renderer.domElement });
+
+// ==========================================
+// MODALITÀ TEST ANIMAZIONI MOSTRO (Regista) — SOLO PER SVILUPPO/TESTING
+// Premi G per attivarla/disattivarla in qualunque momento durante il gioco.
+// Con godmode ON, il mostro continua a vederti/inseguirti/attaccarti (con
+// tanto di animazione + jumpscare) ma NON puoi morire — utile per osservare
+// con calma camminata/idle/attacco senza dover scappare o morire dopo pochi
+// frame. Di default è SEMPRE disattivata (window.DEBUG_GODMODE = false).
+// Ricorda di verificare che sia disattivata prima della consegna finale
+// (di default lo è: si attiva solo premendo G a mano).
+// ==========================================
+window.DEBUG_GODMODE = false;
+document.addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyG') return;
+    window.DEBUG_GODMODE = !window.DEBUG_GODMODE;
+    const stato = window.DEBUG_GODMODE ? 'ON (immortale)' : 'OFF';
+    console.log(`[DEBUG] Godmode: ${stato}`);
+    document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: `DEBUG Godmode: ${stato}` } }));
+});
+
+document.addEventListener('playerAttaccatoDebug', () => {
+    // Stessa animazione/jumpscare della morte vera, ma senza fine partita:
+    // permette di osservare l'attacco del mostro ripetutamente.
+    monster.attack();
+    document.dispatchEvent(new CustomEvent('horrorTrigger', { detail: { eventName: 'PLAYER_ATTACKED' } }));
+});
 
 // ==========================================
 // 3. AVVIO GIOCO (triggerato dal menu)
@@ -67,13 +96,7 @@ document.addEventListener('startGameEvent', async (e) => {
     _torchBatteryMult.mult = 1.0;
     _flickerStepTimer = 0;
     _flickerCurrentMult = 1.0;
-    _fearFlickerStepTimer = 0;
-    _fearFlickerCurrentMult = 1.0;
-    _fearJitterTimer = 0;
-    _fearJitterCurrent.x = 0;
-    _fearJitterCurrent.y = 0;
-    _fearJitterTarget.x = 0;
-    _fearJitterTarget.y = 0;
+    _fearOscTime = 0;
 
     // Crea la mappa giusta
     if (difficulty === 'easy')        currentMap = new MapEasy(scene);
@@ -138,13 +161,26 @@ document.addEventListener('uiTargetChanged', (e) => {
 });
 
 document.addEventListener('itemRaccolto', (e) => {
-    console.log('[GIOCO]: Raccolto chiave!');
-    AudioSystem.playSound('pickup');
+    const idChiave = e.detail.idChiave;
     // La rimozione dalla scena avviene a fine animazione dentro TweenManager
     // (l'oggetto vola via, ruota e si rimpicciolisce prima di sparire).
+
+    if (typeof idChiave === 'string' && idChiave.startsWith('batteria')) {
+        // ── Batteria di ricarica torcia (Regista) ─────────────────────
+        console.log(`[GIOCO]: Raccolta ${idChiave}!`);
+        AudioSystem.playSound('pickup');
+        if (currentMap) currentMap.removeBattery(idChiave);
+        rechargeTorchBattery();
+        document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: 'Battery found! Flashlight fully recharged.' } }));
+        return;
+    }
+
+    // ── Chiave normale (comportamento originale) ──────────────────────
+    console.log('[GIOCO]: Raccolto chiave!');
+    AudioSystem.playSound('pickup');
     if (currentMap) currentMap._goalKeyGroup = null;
     document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: 'Key collected! Return to the golden door.' } }));
-    if (e.detail.idChiave === 'chiave_goal') {
+    if (idChiave === 'chiave_goal') {
         const keyHud = document.getElementById('key-hud');
         if (keyHud) keyHud.style.display = 'flex';
     }
@@ -242,17 +278,126 @@ function showWinScreen() {
 }
 
 
+document.addEventListener('mostroAttacca', () => {
+    // Il mostro è abbastanza vicino da colpire (Regista: mostroAttackRadius,
+    // "un paio di passi" invece che incollato): parte l'animazione di
+    // attacco. Il game over vero e proprio arriva più tardi con 'playerMorto',
+    // sincronizzato con il momento di impatto dell'animazione.
+    monster.attack();
+});
+
+// ==========================================
+// MACCHIA DI SANGUE SUGLI OCCHI (Regista)
+// Tecnica CSS: blob organico (border-radius irregolare a 8 valori) +
+// radial-gradient per l'effetto "bagnato/lucido" + box-shadow multipli per
+// le gocce sparse attorno (nessun elemento DOM extra per le gocce — molto
+// più leggero ed efficace dei semplici cerchi sfocati del primo tentativo).
+// Tutto generato/randomizzato in JS: diverso ad ogni morte.
+// ==========================================
+function _randRange(min, max) { return min + Math.random() * (max - min); }
+
+const _BLOOD_PALETTE = ['#8a0303', '#800000', '#7a0000', '#920404', '#5c0000', '#4a0000', '#3a0000', '#2a0000'];
+function _randomBloodColor() {
+    return _BLOOD_PALETTE[Math.floor(Math.random() * _BLOOD_PALETTE.length)];
+}
+
+/** 8 valori random per un blob organico stondato (4 angoli x 2 assi) */
+function _randomBorderRadius() {
+    const r = () => Math.round(_randRange(30, 70));
+    return `${r()}% ${r()}% ${r()}% ${r()}% / ${r()}% ${r()}% ${r()}% ${r()}%`;
+}
+
+/** Crea un singolo "schizzo" di sangue: blob organico + gocce sparse via box-shadow */
+function _makeBloodBlast(topVh, leftVw, sizeVw) {
+    const el = document.createElement('div');
+    el.className = 'blood-blob';
+    el.style.position = 'absolute';
+    el.style.top    = `${topVh}vh`;
+    el.style.left   = `${leftVw}vw`;
+    el.style.width  = `${sizeVw.toFixed(1)}vw`;
+    el.style.height = `${(sizeVw * _randRange(0.8, 1.2)).toFixed(1)}vw`;
+    el.style.borderRadius = _randomBorderRadius();
+    el.style.transform = `rotate(${_randRange(-40, 40).toFixed(0)}deg)`;
+
+    // Sfumatura radiale con punto luce spostato: dà l'effetto "bagnato/lucido"
+    const light = _randomBloodColor();
+    const mid   = _randomBloodColor();
+    const dark  = _randomBloodColor();
+    el.style.background = `radial-gradient(circle at ${Math.round(_randRange(25, 45))}% ${Math.round(_randRange(25, 45))}%, ${light} 0%, ${mid} 65%, ${dark} 100%)`;
+
+    // Gocce sparse attorno al blob principale, via box-shadow: tecnica
+    // efficiente, nessun elemento DOM aggiuntivo per ogni goccia.
+    const dropletCount = 3 + Math.floor(Math.random() * 4);
+    const shadows = [];
+    for (let i = 0; i < dropletCount; i++) {
+        const dx     = _randRange(-9, 9).toFixed(1);
+        const dy     = _randRange(-9, 9).toFixed(1);
+        const blur   = _randRange(0, 1.5).toFixed(1);
+        const spread = -_randRange(1.5, 3.5).toFixed(1);
+        shadows.push(`${dx}vw ${dy}vh ${blur}px ${spread}px ${_randomBloodColor()}`);
+    }
+    el.style.boxShadow = shadows.join(', ');
+
+    return el;
+}
+
+function generateBloodSplatter() {
+    const container = document.getElementById('blood-splatter-overlay');
+    if (!container) return;
+    container.innerHTML = ''; // pulisce eventuali macchie di una morte precedente
+
+    // 5 schizzi principali, concentrati verso bordi/angoli — il centro
+    // resta più leggibile, come vero sangue schizzato sulla lente/sugli occhi
+    const positions = [
+        { top: _randRange(2, 20),  left: _randRange(2, 20) },
+        { top: _randRange(2, 18),  left: _randRange(78, 96) },
+        { top: _randRange(75, 95), left: _randRange(2, 20) },
+        { top: _randRange(75, 95), left: _randRange(75, 95) },
+        { top: _randRange(80, 96), left: _randRange(38, 58) },
+    ];
+    for (const pos of positions) {
+        const size = _randRange(9, 15); // vw
+        container.appendChild(_makeBloodBlast(pos.top, pos.left, size));
+    }
+
+    // Qualche goccia isolata più piccola, sparsa verso il centro per
+    // "collegare" visivamente gli schizzi principali
+    const extraDroplets = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < extraDroplets; i++) {
+        const size = _randRange(2, 4.5);
+        container.appendChild(_makeBloodBlast(_randRange(15, 80), _randRange(15, 80), size));
+    }
+}
+
 document.addEventListener('playerMorto', () => {
     AudioSystem.playSound('blood_splash');
 
-    // Animazione di attacco del mostro (scatto delle braccia/artigli)
-    monster.attack();
+    // Macchia di sangue "sugli occhi": blob organici generati al volo,
+    // diversi ad ogni morte (compare di scatto al momento del colpo)
+    generateBloodSplatter();
+    const bloodOverlay = document.getElementById('blood-splatter-overlay');
+    if (bloodOverlay) {
+        bloodOverlay.style.transition = 'opacity 150ms ease-out';
+        bloodOverlay.style.opacity = '1';
+    }
 
-    // Jumpscare: flash rosso + scossa di camera, gestiti dal TweenManager
+    // Jumpscare: flash rosso + scossa di schermo, gestiti dal TweenManager
     document.dispatchEvent(new CustomEvent('horrorTrigger', { detail: { eventName: 'PLAYER_ATTACKED' } }));
 
-    // Piccolo ritardo per lasciar vedere l'attacco prima della schermata "YOU DIED"
-    setTimeout(showGameOverScreen, 450);
+    // Dopo un momento (il sangue resta a schermo, la scossa si placa), tutto
+    // dissolve lentamente a nero riusando #fade-overlay...
+    setTimeout(() => {
+        const fadeOverlay = document.getElementById('fade-overlay');
+        if (fadeOverlay) {
+            fadeOverlay.style.transition = 'opacity 900ms ease-in';
+            fadeOverlay.style.backgroundColor = '#000';
+            fadeOverlay.style.opacity = '1';
+        }
+    }, 700);
+
+    // ...e la scritta "YOU DIED" sfuma dentro dal buio (vedi showGameOverScreen),
+    // invece di comparire di colpo come prima.
+    setTimeout(showGameOverScreen, 700 + 900);
 });
 
 document.addEventListener('pointerlockchange', () => {
@@ -271,69 +416,114 @@ function showGameOverScreen() {
     const over = document.getElementById('gameover-overlay');
     if (over) {
         over.style.display = 'flex';
+        // Forza un reflow prima di attivare la transizione di opacità: senza
+        // questo il browser rischia di "fondere" il cambio di display e
+        // quello di opacity nello stesso frame, saltando l'animazione.
+        void over.offsetWidth;
+        over.style.opacity = '1';
     }
 }
 
 // ==========================================
-// 4b. OSCILLAZIONE DELLA TORCIA BASATA SUI PASSI
+// 4b. OSCILLAZIONE DELLA TORCIA — 3 stati di movimento + livello di paura
 // RESPONSABILE: Federico (Regista)
 // La torcia (SpotLight + modello FBX) segue già lo sguardo perché è figlia
-// della camera (PlayerController.js). Qui aggiungiamo solo un lieve bob/sway
-// procedurale in base al movimento del giocatore, senza toccare la logica
-// di collisione/input che appartiene a PlayerController.
+// della camera (PlayerController.js). Qui aggiungiamo un dondolio/oscillazione
+// procedurale che varia in ampiezza e velocità a seconda dello stato:
+//
+//   FERMI    -> oscillazione minima, lenta, sinusoidale (percepibile ma lieve)
+//   CAMMINO  -> oscillazione ben visibile, su/giu e sx/dx, come un braccio
+//               che accompagna il passo
+//   SPRINT   -> oscillazione ancora piu ampia e meno "controllata" (corriamo,
+//               non pensiamo a tenerla ferma, basta che illumini davanti)
+//   PAURA    -> si SOMMA a uno qualsiasi degli stati sopra un movimento extra,
+//               scattoso/irregolare, che cresce quanto piu il mostro e vicino
+//               (funziona anche da fermi, non richiede movimento)
+//
+// In ogni stato il FASCIO (flashlight.target) oscilla piu ampiamente della
+// torcia fisica stessa: e il fascio di luce sulle pareti a dover comunicare
+// chiaramente il movimento, la torcia trema meno (altrimenti sembra un
+// oggetto scollegato dalla mano che lo regge).
 // ==========================================
 let _torchSwayTime = 0;
-const _fearJitterCurrent = { x: 0, y: 0 };
-const _fearJitterTarget  = { x: 0, y: 0 };
-let _fearJitterTimer = 0;
+let _fearOscTime = 0;
 
 function updateTorchSway(deltaTime, fearFactor = 0) {
     if (!player || !player.flashlight) return;
 
-    const isWalking = player.controls.isLocked &&
+    const isWalking   = player.controls.isLocked &&
         (player.keys.forward || player.keys.backward || player.keys.left || player.keys.right);
-    const speedMul = player.isSprinting ? 1.9 : 1.0;
+    const isSprinting = isWalking && player.isSprinting;
 
-    _torchSwayTime += deltaTime * (isWalking ? 6.5 * speedMul : 1.0);
+    // -- 1. Parametri di base per lo stato di movimento corrente ----------
+    // timeSpeed  = velocita dell'oscillazione (Hz-ish)
+    // bobAmount  = ampiezza verticale (su/giu) della TORCIA
+    // swayAmount = ampiezza laterale (sx/dx) della TORCIA
+    // pushAmount = leggera spinta avanti ad ogni "passo"
+    // tiltAmount = inclinazione (roll) del modello visivo
+    // aimMult    = quanto piu ampio oscilla il FASCIO rispetto alla torcia
+    let timeSpeed, bobAmount, swayAmount, pushAmount, tiltAmount, aimMult;
 
-    // Ampiezze marcate durante il cammino, per un dondolio di mano ben
-    // percepibile (non solo un lieve tremolio) — quasi il doppio di prima.
-    const bobAmount  = isWalking ? 0.12  : 0.012; // oscillazione verticale (su/giù ad ogni passo)
-    const swayAmount = isWalking ? 0.08 : 0.008; // oscillazione laterale (sx/dx ad ogni passo)
-    const pushAmount = isWalking ? 0.05 : 0.0;   // leggera spinta avanti ad ogni passo
-    const tiltAmount = isWalking ? 0.15  : 0.015; // inclinazione (roll) del modello visivo
+    if (isSprinting) {
+        // Corsa: molto mossa, poco controllata -- basta che illumini davanti
+        timeSpeed  = 11.0;
+        bobAmount  = 0.16;  swayAmount = 0.13;
+        pushAmount = 0.05;  tiltAmount = 0.11;
+        aimMult    = 2.3;
+    } else if (isWalking) {
+        // Camminata: dondolio ben evidente, come un braccio che accompagna il passo
+        timeSpeed  = 6.5;
+        bobAmount  = 0.09;  swayAmount = 0.075;
+        pushAmount = 0.035; tiltAmount = 0.06;
+        aimMult    = 1.8;
+    } else {
+        // Fermi: oscillazione minima ma percepibile, sinusoidale e lieve
+        timeSpeed  = 1.3;
+        bobAmount  = 0.018; swayAmount = 0.015;
+        pushAmount = 0.0;   tiltAmount = 0.02;
+        aimMult    = 1.5;
+    }
+
+    _torchSwayTime += deltaTime * timeSpeed;
 
     const bobY  = Math.sin(_torchSwayTime * 2) * bobAmount;
     const swayX = Math.cos(_torchSwayTime)     * swayAmount;
     const pushZ = Math.abs(Math.sin(_torchSwayTime * 2)) * pushAmount;
 
-    // ─────────────────────────────────────────────────────────────
-    // TREMORE DA PAURA — versione "smussata": invece di saltare a un
-    // valore random ogni singolo frame (che a 60fps legge come un glitch),
-    // ci si muove morbidamente (lerp) verso un nuovo bersaglio random
-    // generato ogni ~90ms. Ampiezza volutamente contenuta: la sensazione
-    // di frenesia la dà soprattutto il flicker della LUCE qui sotto
-    // (computeFearFlickerMult), non lo scuotimento fisico dell'oggetto.
-    // ─────────────────────────────────────────────────────────────
-    _fearJitterTimer += deltaTime;
-    const fearJitterMaxAmount = fearFactor * fearFactor * 0.035; // molto più contenuto di prima
-    if (_fearJitterTimer >= 0.09) {
-        _fearJitterTimer = 0;
-        _fearJitterTarget.x = (Math.random() - 0.5) * fearJitterMaxAmount;
-        _fearJitterTarget.y = (Math.random() - 0.5) * fearJitterMaxAmount;
-    }
-    const jitterLerp = 1 - Math.pow(0.0001, deltaTime); // smoothing costante nel tempo, non frame-rate dependent
-    _fearJitterCurrent.x += (_fearJitterTarget.x - _fearJitterCurrent.x) * jitterLerp;
-    _fearJitterCurrent.y += (_fearJitterTarget.y - _fearJitterCurrent.y) * jitterLerp;
+    // Il fascio (target) usa una fase leggermente sfasata sull'asse verticale
+    // rispetto alla torcia fisica, per un moto naturale (non a specchio),
+    // ed e amplificato da aimMult cosi il movimento sulle pareti e ben visibile.
+    const aimX = swayX * aimMult;
+    const aimY = Math.sin(_torchSwayTime * 2 + 0.5) * bobAmount * aimMult;
 
-    const fearJitterX = _fearJitterCurrent.x;
-    const fearJitterY = _fearJitterCurrent.y;
+    // -----------------------------------------------------------------
+    // PAURA -- si somma SOPRA lo stato di movimento corrente (fermi, cammino
+    // o sprint) un tremore scattoso e irregolare, che funziona anche da
+    // fermi e non richiede movimento. Il tempo scorre sempre e accelera con
+    // fearFactor: piu il mostro e vicino, piu i movimenti sono rapidi.
+    // Sommiamo due onde a frequenze/fasi diverse -> oscillazione irregolare
+    // "a scatti", diversa dalla sinusoide regolare del passo/sprint.
+    // -----------------------------------------------------------------
+    _fearOscTime += deltaTime * (2.5 + fearFactor * 9);
 
-    const totalX = swayX + fearJitterX;
-    const totalY = bobY  + fearJitterY;
+    const fearAmp = fearFactor * fearFactor; // cresce di piu quando il mostro e VICINO (curva quadratica)
+
+    const oscX = Math.sin(_fearOscTime * 2.2)       * 0.6 + Math.sin(_fearOscTime * 5.3 + 1.7) * 0.4;
+    const oscY = Math.cos(_fearOscTime * 1.8 + 0.5) * 0.6 + Math.cos(_fearOscTime * 4.6)        * 0.4;
+
+    const FEAR_AIM_MAX_OFFSET   = 0.5;   // il FASCIO si muove tanto quando la paura e massima
+    const FEAR_TORCH_MAX_OFFSET = 0.035; // la TORCIA fisica trema molto meno
+
+    const fearAimX   = oscX * fearAmp * FEAR_AIM_MAX_OFFSET;
+    const fearAimY   = oscY * fearAmp * FEAR_AIM_MAX_OFFSET;
+    const fearTorchX = oscX * fearAmp * FEAR_TORCH_MAX_OFFSET;
+    const fearTorchY = oscY * fearAmp * FEAR_TORCH_MAX_OFFSET;
+
+    const totalX = swayX + fearTorchX;
+    const totalY = bobY  + fearTorchY;
 
     // Applica l'offset in modo relativo alla posizione base "di riposo" di
-    // ogni oggetto (memorizzata al primo frame utile), così l'effetto resta
+    // ogni oggetto (memorizzata al primo frame utile), cosi l'effetto resta
     // valido qualunque sia la posizione originale scelta da PlayerController.
     for (const obj of [player.flashlight, player.flashlightModel]) {
         if (!obj) continue;
@@ -346,57 +536,52 @@ function updateTorchSway(deltaTime, fearFactor = 0) {
 
     // Leggera rotazione (roll) del solo MODELLO VISIVO della torcia: puramente
     // cosmetica, non tocca la direzione reale del fascio (governata da
-    // flashlight.target, animato più sotto), quindi nessun rischio di
+    // flashlight.target, animato piu sotto), quindi nessun rischio di
     // "sfasare" il cono di luce rispetto a dove il giocatore sta guardando.
     if (player.flashlightModel) {
         if (player.flashlightModel.userData._swayBaseRotZ === undefined) {
             player.flashlightModel.userData._swayBaseRotZ = player.flashlightModel.rotation.z;
         }
         const baseRotZ = player.flashlightModel.userData._swayBaseRotZ;
-        player.flashlightModel.rotation.z = baseRotZ + Math.cos(_torchSwayTime) * tiltAmount + fearJitterX * 1.5;
+        player.flashlightModel.rotation.z = baseRotZ + Math.cos(_torchSwayTime) * tiltAmount + fearTorchX * 2.0;
     }
 
-    // Il target della torcia (verso cui punta il fascio) segue con un
-    // offset più leggero per non far "impazzire" il cono di luce.
+    // Il FASCIO (il target) oscilla piu ampiamente della torcia fisica in
+    // ogni stato (fermi/cammino/sprint), e la paura si aggiunge sopra:
+    // e questo a comunicare davvero il movimento sulle pareti.
     if (player.flashlight.target) {
         if (!player.flashlight.target.userData._swayBase) {
             player.flashlight.target.userData._swayBase = player.flashlight.target.position.clone();
         }
         const baseT = player.flashlight.target.userData._swayBase;
         player.flashlight.target.position.set(
-            baseT.x + fearJitterX * 0.5,
-            baseT.y + bobY * 0.4 + fearJitterY * 0.5,
+            baseT.x + aimX + fearAimX,
+            baseT.y + aimY + fearAimY,
             baseT.z
         );
     }
 }
 
 // ==========================================
-// 4c-bis. FLICKER DA PAURA (Regista)
-// Quando il mostro è vicino, la LUCE diventa nervosa/instabile — è questo,
-// più che lo scuotimento fisico, a comunicare la frenesia. Stesso schema
-// del flicker da batteria scarica: frequenza e profondità crescono con
-// fearFactor. Si combina moltiplicativamente con quello della batteria.
+// 4c-ter. RICARICA TORCIA — raccolta batteria (Regista)
+// Riporta la batteria al 100% e riusa esattamente lo stesso evento/tween
+// della dissolvenza di scarica (norm=1 → angle/distance/intensità tornano
+// al massimo con la stessa animazione morbida, nessun codice duplicato).
 // ==========================================
-let _fearFlickerStepTimer = 0;
-let _fearFlickerCurrentMult = 1.0;
+function rechargeTorchBattery() {
+    if (!player || !player.flashlight) return;
 
-function computeFearFlickerMult(deltaTime, fearFactor) {
-    if (fearFactor <= 0.02) {
-        _fearFlickerCurrentMult = 1.0;
-        return 1.0;
-    }
+    torchBatteryPercent = 100;
+    _torchDrainTimer = 0;
 
-    const flickerFreqHz = 2 + fearFactor * 16;   // fino a ~18 scatti al secondo quando è vicinissimo
-    const flickerDepth  = 0.1 + fearFactor * 0.55; // fino a un calo drastico
-
-    _fearFlickerStepTimer += deltaTime;
-    const stepDuration = 1 / flickerFreqHz;
-    if (_fearFlickerStepTimer >= stepDuration) {
-        _fearFlickerStepTimer = 0;
-        _fearFlickerCurrentMult = Math.random() < 0.55 ? (1 - flickerDepth) : 1.0;
-    }
-    return _fearFlickerCurrentMult;
+    document.dispatchEvent(new CustomEvent('torciaScarica', {
+        detail: {
+            percent: torchBatteryPercent,
+            norm: 1,
+            proxy: _torchBatteryMult,
+            torcia: player.flashlight,
+        }
+    }));
 }
 
 // ==========================================
@@ -490,7 +675,7 @@ function animate() {
         let fearFactor = 0;
         if (player.mostroAggroRadius) {
             const farEdge  = player.mostroAggroRadius;
-            const nearEdge = player.mostroDamageRadius || 1.2;
+            const nearEdge = player.mostroAttackRadius || 2.5;
             fearFactor = 1 - Math.min(1, Math.max(0, (distanza - nearEdge) / (farEdge - nearEdge)));
         }
 
@@ -500,15 +685,16 @@ function animate() {
         // Applica il calo batteria SOPRA l'intensità che PlayerController ha
         // appena calcolato per questo frame (base + eventuale sfarfallio).
         // Va fatto qui, dopo player.update(), altrimenti verrebbe sovrascritto.
+        // NB: la paura NON tocca l'intensità — muove solo la mira del fascio
+        // (vedi updateTorchSway/fearFactor qui sopra).
         if (player.flashlight) {
             const batteryFlickerMult = computeLowBatteryFlickerMult(deltaTime, torchBatteryPercent);
-            const fearFlickerMult    = computeFearFlickerMult(deltaTime, fearFactor);
-            player.flashlight.intensity *= _torchBatteryMult.mult * batteryFlickerMult * fearFlickerMult;
+            player.flashlight.intensity *= _torchBatteryMult.mult * batteryFlickerMult;
         }
 
         const isMoving = player.controls.isLocked
             && distanza <= player.mostroAggroRadius
-            && distanza > player.mostroDamageRadius;
+            && distanza > (player.mostroAttackRadius || 2.5);
             
         // Manage BGM state based on distance
         if (distanza <= player.mostroAggroRadius) {

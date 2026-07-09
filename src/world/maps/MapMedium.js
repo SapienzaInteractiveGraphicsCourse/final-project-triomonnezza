@@ -265,5 +265,10 @@ export class MapMedium extends MapBase {
         this.monsterSpawn         = new THREE.Vector3(30, 2.454, 46);
         // Key in Room C (Staff Room) SW corner — open floor, no furniture on top
         this.spawnGoalKey(new THREE.Vector3(26, 1.3, 52));
+
+        // ── Batterie di ricarica torcia (Regista) ─────────────────────
+        // 2 batterie su Medium — Room B (lato opposto allo spawn) e closet J_2
+        this.spawnBattery(new THREE.Vector3(50, 0, 4),  'batteria_medium_1');
+        this.spawnBattery(new THREE.Vector3(10, 0, 44), 'batteria_medium_2');
     }
 }

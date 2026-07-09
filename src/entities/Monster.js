@@ -160,7 +160,7 @@ export class Monster {
             avanbraccioDx.add(artiglio);
         }
 
-        // 5. GAMBA SINISTRA
+        // 5. GAMBA SINISTRA (con giunto ginocchio articolato)
         const gambaSx = new THREE.Group();
         gambaSx.name = 'gamba_sx';
         gambaSx.position.set(-0.3, -0.6, 0);
@@ -171,11 +171,16 @@ export class Monster {
         const thighSx = new THREE.Mesh(thighSxGeom, skinMaterial);
         gambaSx.add(thighSx);
 
+        // Ginocchio: nuovo giunto pivot (stesso pattern spalla→gomito del braccio)
+        const ginocchioSx = new THREE.Group();
+        ginocchioSx.name = 'ginocchio_sx';
+        ginocchioSx.position.set(0, -0.45, 0);
+        gambaSx.add(ginocchioSx);
+
         const shinSxGeom = new THREE.BoxGeometry(0.18, 0.45, 0.18);
         shinSxGeom.translate(0, -0.225, 0);
         const shinSx = new THREE.Mesh(shinSxGeom, skinMaterial);
-        shinSx.position.set(0, -0.45, 0);
-        gambaSx.add(shinSx);
+        ginocchioSx.add(shinSx); // ora figlio del ginocchio, non più dell'anca
 
         // Piede
         const footSx = new THREE.Mesh(
@@ -185,7 +190,7 @@ export class Monster {
         footSx.position.set(0, -0.45, 0.05);
         shinSx.add(footSx);
 
-        // 6. GAMBA DESTRA
+        // 6. GAMBA DESTRA (con giunto ginocchio articolato)
         const gambaDx = new THREE.Group();
         gambaDx.name = 'gamba_dx';
         gambaDx.position.set(0.3, -0.6, 0);
@@ -196,11 +201,15 @@ export class Monster {
         const thighDx = new THREE.Mesh(thighDxGeom, skinMaterial);
         gambaDx.add(thighDx);
 
+        const ginocchioDx = new THREE.Group();
+        ginocchioDx.name = 'ginocchio_dx';
+        ginocchioDx.position.set(0, -0.45, 0);
+        gambaDx.add(ginocchioDx);
+
         const shinDxGeom = new THREE.BoxGeometry(0.18, 0.45, 0.18);
         shinDxGeom.translate(0, -0.225, 0);
         const shinDx = new THREE.Mesh(shinDxGeom, skinMaterial);
-        shinDx.position.set(0, -0.45, 0);
-        gambaDx.add(shinDx);
+        ginocchioDx.add(shinDx);
 
         // Piede
         const footDx = new THREE.Mesh(
@@ -212,13 +221,15 @@ export class Monster {
 
         // Riferimenti pubblici per le animazioni di Federico
         this.corpo         = corpo;
-        this.testa         = testa;
-        this.braccioSx     = braccioSx;
-        this.braccioDx     = braccioDx;
-        this.avanbraccioSx = avanbraccioSx;
-        this.avanbraccioDx = avanbraccioDx;
-        this.gambaSx       = gambaSx;
-        this.gambaDx       = gambaDx;
+        this.testa          = testa;
+        this.braccioSx      = braccioSx;
+        this.braccioDx      = braccioDx;
+        this.avanbraccioSx  = avanbraccioSx;
+        this.avanbraccioDx  = avanbraccioDx;
+        this.gambaSx        = gambaSx;
+        this.gambaDx        = gambaDx;
+        this.ginocchioSx    = ginocchioSx;
+        this.ginocchioDx    = ginocchioDx;
     }
 
     /** Inizializza i suoni posizionali (chiamato dopo il preload) */
@@ -248,9 +259,26 @@ export class Monster {
     // ANIMAZIONI PROCEDURALI (tween.js) — vietato importare animazioni esterne
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Ferma tutti i tween attivi nel gruppo isolato del mostro */
+    /**
+     * Ferma tutti i tween attivi nel gruppo isolato del mostro.
+     *
+     * Riporta esplicitamente a zero anche le proprietà usate SOLO
+     * dall'attacco (testa.rotation.x, testa/corpo.position.z, corpo.position.y,
+     * braccia.rotation.z): se un attacco viene interrotto a metà del suo
+     * rientro (es. cambia stato verso camminata/idle prima che lo yoyo/catena
+     * di ritorno finisca — può succedere in modalità test con attacchi
+     * ravvicinati), queste proprietà resterebbero altrimenti "bloccate"
+     * nella posa del colpo, perché camminata/idle non le toccano mai e
+     * quindi non le correggerebbero da sole.
+     */
     _stopAllTweens() {
         this._tweenGroup.removeAll();
+        this.testa.rotation.x = 0;
+        this.testa.position.z = 0;
+        this.corpo.position.z = 0;
+        this.corpo.position.y = 0;
+        this.braccioSx.rotation.z = 0;
+        this.braccioDx.rotation.z = 0;
     }
 
     /**
@@ -306,6 +334,33 @@ export class Monster {
             .yoyo(true).repeat(Infinity)
             .start();
 
+        // Ginocchia: si piegano durante la fase di sollevamento del passo.
+        // Frequenza doppia rispetto all'anca (dur/2): si flettono ad ogni
+        // "apice" dell'oscillazione anziché restare rigide come un blocco
+        // unico — sfrutta il nuovo giunto ginocchio→stinco della gerarchia.
+        new TWEEN.Tween(this.ginocchioSx.rotation, this._tweenGroup)
+            .to({ x: 0.55 }, dur / 2)
+            .easing(TWEEN.Easing.Sinusoidal.InOut)
+            .yoyo(true).repeat(Infinity)
+            .start();
+
+        // Sfasata di un quarto di ciclo rispetto alla sinistra, per non
+        // piegarsi esattamente in sincrono con l'altro ginocchio.
+        new TWEEN.Tween(this.ginocchioDx.rotation, this._tweenGroup)
+            .to({ x: 0.55 }, dur / 2)
+            .delay(dur / 2)
+            .easing(TWEEN.Easing.Sinusoidal.InOut)
+            .yoyo(true).repeat(Infinity)
+            .start();
+
+        // Bob verticale del busto: dà peso/impatto al passo (prima solo la
+        // testa si muoveva, il busto restava fermo → sembrava "scivolare").
+        new TWEEN.Tween(this.corpo.position, this._tweenGroup)
+            .to({ y: 0.05 }, dur)
+            .easing(TWEEN.Easing.Sinusoidal.InOut)
+            .yoyo(true).repeat(Infinity)
+            .start();
+
         // Testa: leggero bob laterale + su/giù (passo ritmico, periodo doppio)
         new TWEEN.Tween(this.testa.rotation, this._tweenGroup)
             .to({ y: 0.18, z: 0.07 }, dur * 2)
@@ -329,6 +384,21 @@ export class Monster {
         this._animState = 'idle';
 
         const dur = 1400; // ms — molto più lento del passo
+
+        // Riporta rapidamente le gambe/ginocchia a posizione neutra: se si
+        // arriva qui a metà di un passo (camminata appena interrotta), senza
+        // questo le gambe resterebbero bloccate in una posa a metà falcata.
+        const resetDur = 300;
+        for (const joint of [this.gambaSx, this.gambaDx, this.ginocchioSx, this.ginocchioDx]) {
+            new TWEEN.Tween(joint.rotation, this._tweenGroup)
+                .to({ x: 0 }, resetDur)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+        }
+        new TWEEN.Tween(this.corpo.position, this._tweenGroup)
+            .to({ y: 0 }, resetDur)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .start();
 
         // Respirazione: testa sale e scende impercettibilmente
         new TWEEN.Tween(this.testa.position, this._tweenGroup)
@@ -359,10 +429,20 @@ export class Monster {
     }
 
     /**
-     * Animazione di ATTACCO (one-shot): il mostro scatta in avanti con le
-     * braccia/artigli tesi verso il giocatore, poi torna in stato neutro.
-     * Chiamata da main.js sull'evento 'playerMorto' — è il "colpo di grazia"
-     * che il giocatore vede subito prima della schermata di Game Over.
+     * Animazione di ATTACCO (one-shot), in 3 fasi concatenate — più lunga e
+     * leggibile di prima, pensata per essere vista da qualche passo di
+     * distanza (il mostro ora scatta quando sei a ~2.5m, non più incollato):
+     *
+     *   1. ANTICIPAZIONE (260ms) — braccia indietro, busto si accovaccia e
+     *      si inarca all'indietro: il classico "richiamo" prima del colpo.
+     *   2. SCATTO (200ms) — le braccia si aprono a "artiglio" con uno swing
+     *      diagonale (non solo in avanti), busto/testa proiettati avanti.
+     *   3. ASSESTAMENTO (300ms) — tutto torna lentamente a neutro: dà peso
+     *      al colpo invece di scattare indietro di colpo come un elastico.
+     *
+     * Durata totale ~760ms (~doppia della versione precedente).
+     *
+     * Le gambe NON partecipano (restano ferme dove sono): scelta voluta.
      *
      * Durante l'attacco lo stato animazione viene bloccato su 'attack' cosicché
      * update() non lo sovrascriva a metà mentre i tween sono ancora attivi.
@@ -371,52 +451,78 @@ export class Monster {
         this._stopAllTweens();
         this._animState = 'attack';
 
-        const lungeDur = 140; // scatto rapido e brutale, non un movimento fluido
+        const anticipDur = 260; // richiamo indietro, lento e leggibile
+        const lungeDur    = 200; // scatto vero e proprio, ancora rapido
+        const recoilDur   = 300; // rientro lento, dà "peso" dopo il colpo
 
-        // Le braccia scattano in avanti/alto come per colpire
-        new TWEEN.Tween(this.braccioSx.rotation, this._tweenGroup)
-            .to({ x: -1.35 }, lungeDur)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .start();
-        new TWEEN.Tween(this.braccioDx.rotation, this._tweenGroup)
-            .to({ x: -1.35 }, lungeDur)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .start();
+        // ── 1. ANTICIPAZIONE ────────────────────────────────────────────
+        const anticipBraccioSx = new TWEEN.Tween(this.braccioSx.rotation, this._tweenGroup)
+            .to({ x: 0.5, z: 0.15 }, anticipDur).easing(TWEEN.Easing.Quadratic.Out);
+        const anticipBraccioDx = new TWEEN.Tween(this.braccioDx.rotation, this._tweenGroup)
+            .to({ x: 0.5, z: -0.15 }, anticipDur).easing(TWEEN.Easing.Quadratic.Out);
+        const anticipCorpo = new TWEEN.Tween(this.corpo.position, this._tweenGroup)
+            .to({ y: -0.08, z: 0.18 }, anticipDur).easing(TWEEN.Easing.Quadratic.Out); // si accovaccia e si inarca indietro
+        const anticipTesta = new TWEEN.Tween(this.testa.position, this._tweenGroup)
+            .to({ z: 0.18 }, anticipDur).easing(TWEEN.Easing.Quadratic.Out);
 
-        // Gli avambracci si distendono (artigli in avanti)
-        new TWEEN.Tween(this.avanbraccioSx.rotation, this._tweenGroup)
-            .to({ x: -0.85 }, lungeDur)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .start();
-        new TWEEN.Tween(this.avanbraccioDx.rotation, this._tweenGroup)
-            .to({ x: -0.85 }, lungeDur)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .start();
+        // ── 2. SCATTO (swing diagonale, non solo dritto in avanti) ────────
+        const strikeBraccioSx = new TWEEN.Tween(this.braccioSx.rotation, this._tweenGroup)
+            .to({ x: -1.5, z: -0.35 }, lungeDur).easing(TWEEN.Easing.Quadratic.Out);
+        const strikeBraccioDx = new TWEEN.Tween(this.braccioDx.rotation, this._tweenGroup)
+            .to({ x: -1.5, z: 0.35 }, lungeDur).easing(TWEEN.Easing.Quadratic.Out);
+        const strikeAvanbraccioSx = new TWEEN.Tween(this.avanbraccioSx.rotation, this._tweenGroup)
+            .to({ x: -0.95 }, lungeDur).easing(TWEEN.Easing.Quadratic.Out);
+        const strikeAvanbraccioDx = new TWEEN.Tween(this.avanbraccioDx.rotation, this._tweenGroup)
+            .to({ x: -0.95 }, lungeDur).easing(TWEEN.Easing.Quadratic.Out);
+        const strikeCorpo = new TWEEN.Tween(this.corpo.position, this._tweenGroup)
+            .to({ y: 0.02, z: -0.5 }, lungeDur).easing(TWEEN.Easing.Quadratic.Out);
+        const strikeTesta = new TWEEN.Tween(this.testa.position, this._tweenGroup)
+            .to({ z: -0.5 }, lungeDur).easing(TWEEN.Easing.Quadratic.Out);
+        const strikeTestaRot = new TWEEN.Tween(this.testa.rotation, this._tweenGroup)
+            .to({ x: 0.65 }, lungeDur).easing(TWEEN.Easing.Quadratic.Out);
 
-        // Il busto e la testa si proiettano in avanti (yoyo: scatta e ritorna)
-        new TWEEN.Tween(this.corpo.position, this._tweenGroup)
-            .to({ z: -0.4 }, lungeDur)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .yoyo(true).repeat(1)
-            .start();
-
-        new TWEEN.Tween(this.testa.position, this._tweenGroup)
-            .to({ z: -0.4 }, lungeDur)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .yoyo(true).repeat(1)
+        // ── 3. ASSESTAMENTO — rientro lento, non un elastico ──────────────
+        const recoilBraccioSx = new TWEEN.Tween(this.braccioSx.rotation, this._tweenGroup)
+            .to({ x: 0, z: 0 }, recoilDur).easing(TWEEN.Easing.Quadratic.InOut);
+        const recoilBraccioDx = new TWEEN.Tween(this.braccioDx.rotation, this._tweenGroup)
+            .to({ x: 0, z: 0 }, recoilDur).easing(TWEEN.Easing.Quadratic.InOut);
+        const recoilAvanbraccioSx = new TWEEN.Tween(this.avanbraccioSx.rotation, this._tweenGroup)
+            .to({ x: 0 }, recoilDur).easing(TWEEN.Easing.Quadratic.InOut);
+        const recoilAvanbraccioDx = new TWEEN.Tween(this.avanbraccioDx.rotation, this._tweenGroup)
+            .to({ x: 0 }, recoilDur).easing(TWEEN.Easing.Quadratic.InOut);
+        const recoilCorpo = new TWEEN.Tween(this.corpo.position, this._tweenGroup)
+            .to({ y: 0, z: 0 }, recoilDur).easing(TWEEN.Easing.Quadratic.InOut);
+        const recoilTesta = new TWEEN.Tween(this.testa.position, this._tweenGroup)
+            .to({ z: 0 }, recoilDur).easing(TWEEN.Easing.Quadratic.InOut);
+        const recoilTestaRot = new TWEEN.Tween(this.testa.rotation, this._tweenGroup)
+            .to({ x: 0 }, recoilDur).easing(TWEEN.Easing.Quadratic.InOut)
             .onComplete(() => {
                 // Rilascia il lock di stato: il prossimo update() potrà
                 // riportare il mostro in idle/walk normalmente.
                 this._animState = null;
-            })
-            .start();
+            });
 
-        // Testa: scatto rotazionale rabbioso verso il basso (per "mordere")
-        new TWEEN.Tween(this.testa.rotation, this._tweenGroup)
-            .to({ x: 0.5 }, lungeDur)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .yoyo(true).repeat(1)
-            .start();
+        // Concatena: anticipazione → scatto → assestamento
+        anticipBraccioSx.chain(strikeBraccioSx); strikeBraccioSx.chain(recoilBraccioSx);
+        anticipBraccioDx.chain(strikeBraccioDx); strikeBraccioDx.chain(recoilBraccioDx);
+        anticipCorpo.chain(strikeCorpo);         strikeCorpo.chain(recoilCorpo);
+        anticipTesta.chain(strikeTesta);         strikeTesta.chain(recoilTesta);
+
+        anticipBraccioSx.start();
+        anticipBraccioDx.start();
+        anticipCorpo.start();
+        anticipTesta.start();
+
+        // Avambracci e rotazione testa non hanno una fase di anticipazione
+        // propria (seguono l'arto/il busto a cui appartengono): partono
+        // insieme allo scatto, dopo lo stesso ritardo dell'anticipazione.
+        strikeAvanbraccioSx.chain(recoilAvanbraccioSx);
+        strikeAvanbraccioDx.chain(recoilAvanbraccioDx);
+        strikeTestaRot.chain(recoilTestaRot);
+
+        strikeAvanbraccioSx.delay(anticipDur).start();
+        strikeAvanbraccioDx.delay(anticipDur).start();
+        strikeTestaRot.delay(anticipDur).start();
     }
 
     /** Stato animazione corrente ('walk' | 'idle' | 'attack' | null) */
@@ -445,6 +551,25 @@ export class Monster {
         if (this.stepSound) {
             this.stepSound.setVolume(isMoving ? 1.0 : 0.0);
         }
+
+        // Inclinazione predatoria in avanti quando insegue, eretto quando
+        // fermo/attacca. IMPORTANTE: applicata a `corpo.rotation.x`, MAI a
+        // `root.rotation`/`root.quaternion` — quella proprietà è "di
+        // proprietà" di PlayerController, che ogni frame chiama
+        // mostroMesh.lookAt() per farlo girare verso il giocatore. La
+        // decomposizione di un quaternion in angoli Euler non è unica: per
+        // certi angoli di imbardata lookAt() può produrre una
+        // rappresentazione x/z "capovolta ma equivalente" (es. x≈180° invece
+        // di x≈0), e sovrascrivere solo rotation.x in quel caso produceva
+        // un orientamento visivamente sbagliato in modo intermittente (il
+        // "cammina a testa in giù" osservato, a volte sì a volte no a
+        // seconda dell'angolo). corpo.rotation.x non è mai toccato da
+        // nessun altro sistema (lookAt, attacco, camminata): zero conflitti.
+        const targetLean = (isMoving && this._animState !== 'attack') ? 0.16 : 0;
+        this._currentLean = this._currentLean ?? 0;
+        this._currentLean += (targetLean - this._currentLean) * Math.min(1, deltaTime * 5);
+        this._currentLean = Math.max(-0.3, Math.min(0.3, this._currentLean));
+        this.corpo.rotation.x = this._currentLean;
 
         // Aggiorna tutti i tween del gruppo isolato del mostro
         this._tweenGroup.update();

@@ -228,5 +228,9 @@ export class MapEasy extends MapBase {
         this.monsterSpawn         = new THREE.Vector3(30, 2.454, 6);
         // Key in Room B (Kitchen) SE corner — open floor, no furniture on top
         this.spawnGoalKey(new THREE.Vector3(35, 1.3, 12));
+
+        // ── Batteria di ricarica torcia (Regista) ─────────────────────
+        // 1 batteria su Easy — Room C (Living room), lontana da chiave/spawn
+        this.spawnBattery(new THREE.Vector3(16, 0, 20), 'batteria_easy_1');
     }
 }

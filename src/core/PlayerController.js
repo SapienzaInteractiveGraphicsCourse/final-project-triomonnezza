@@ -51,7 +51,9 @@ export class PlayerController {
         // 5. Parametri di Stato dell'Inseguitore (AI del Mostro)
         this.mostroSpeed = 4.2;      // Velocità lineare del mostro
         this.mostroAggroRadius = 15; // Raggio del sensore di sbarco (in metri)
-        this.mostroDamageRadius = 1.2;// Distanza di attacco (Game Over)
+        this.mostroDamageRadius = 1.2;// Distanza di "impatto" grezza (non più usata per il trigger, vedi mostroAttackRadius)
+        this.mostroAttackRadius = 2.5; // Distanza a cui il mostro scatta e attacca (Regista) — "un paio di passi", non più incollato
+        this.ATTACK_IMPACT_DELAY = 0.46; // secondi tra inizio animazione attacco e "impatto" (Game Over) — sincronizzato con Monster.js:attack()
 
         // 6. Registro Input da tastiera
         this.keys = { forward: false, backward: false, left: false, right: false, space: false };
@@ -330,7 +332,11 @@ export class PlayerController {
                         targetName = 'Open Door';
                     }
                 } else if (ud.tipo === 'chiave') {
-                    targetName = 'Pick Up Golden Key';
+                    // Permette a oggetti con tipo:'chiave' di sovrascrivere il testo
+                    // di default (es. le batterie, che riusano lo stesso sistema
+                    // ma non sono "Golden Key") — comportamento esistente invariato
+                    // se ud.nome non è impostato.
+                    targetName = ud.nome || 'Pick Up Golden Key';
                 } else if (ud.tipo === 'porta_goal') {
                     targetName = 'Open Gate';
                 } else if (ud.nome) {
@@ -432,6 +438,9 @@ export class PlayerController {
                 escapeDir: null,         // vettore di fuga temporaneo
                 escapeClock: 0,          // quanto dura la fuga
                 steerDir: new THREE.Vector3(), // direzione di steering corrente
+                isAttacking: false,      // true durante la sequenza di attacco (Regista)
+                attackTimer: 0,          // secondi trascorsi dall'inizio dell'attacco corrente
+                attackResolved: false,   // true dopo che 'playerMorto' è già stato dispatchato per questo attacco
             };
         }
         const ai = this._aiState;
@@ -441,12 +450,55 @@ export class PlayerController {
         toPlayer.y = 0;
         const distanzaEuclidea = toPlayer.length();
 
-        // ── Condizione di Impatto ─────────────────────────────────────────────
-        if (distanzaEuclidea <= this.mostroDamageRadius) {
-            this.salute = 0;
-            this.controls.unlock();
-            this._dispatchGlobalEvent('playerMorto', { mostro: mostroMesh });
-            return;
+        // ── Sequenza di attacco (Regista) ─────────────────────────────────────
+        // Il mostro non colpisce più "incollato" al giocatore: scatta in avanti
+        // quando sei a un paio di passi (mostroAttackRadius), così l'animazione
+        // di attacco si vede per bene invece di risolversi a distanza zero.
+        // Il game over vero e proprio ('playerMorto') arriva più tardi,
+        // sincronizzato con il momento di "impatto" dell'animazione
+        // (ATTACK_IMPACT_DELAY), non nell'istante in cui scatta l'attacco.
+        if (!ai.isAttacking && distanzaEuclidea <= this.mostroAttackRadius) {
+            ai.isAttacking    = true;
+            ai.attackTimer    = 0;
+            ai.attackResolved = false;
+            mostroMesh.lookAt(this.camera.position.x, mostroMesh.position.y, this.camera.position.z);
+
+            if (window.DEBUG_GODMODE) {
+                // Modalità test (vedi main.js, tasto G): stessa animazione,
+                // ma niente game over — permette di osservarla ripetutamente.
+                this._dispatchGlobalEvent('playerAttaccatoDebug', { mostro: mostroMesh });
+            } else {
+                // NB: NON chiamiamo this.controls.unlock() qui. Farlo
+                // rilascia subito il pointer-lock, e la UI (index.html)
+                // interpreta qualunque pointer-unlock come "torna al menu/
+                // pausa" mostrando l'overlay delle istruzioni — sembrava una
+                // pausa automatica, e cliccando per "riprendere" prima che
+                // l'attacco si risolvesse (460ms dopo) si moriva comunque,
+                // dando l'impressione di una morte a tradimento. La morte è
+                // già garantita dal timer qui sotto (ai.attackResolved),
+                // quindi non serve bloccare i controlli in anticipo:
+                // showGameOverScreen() fa già l'unlock al momento giusto,
+                // quando la schermata di game over appare davvero.
+                this._dispatchGlobalEvent('mostroAttacca', { mostro: mostroMesh });
+            }
+        }
+
+        if (ai.isAttacking) {
+            ai.attackTimer += deltaTime;
+
+            if (!window.DEBUG_GODMODE && !ai.attackResolved && ai.attackTimer >= this.ATTACK_IMPACT_DELAY) {
+                ai.attackResolved = true;
+                this.salute = 0;
+                this._dispatchGlobalEvent('playerMorto', { mostro: mostroMesh });
+            }
+
+            // In godmode, dopo animazione + una pausa, permette un nuovo
+            // attacco se il giocatore è ancora nel raggio.
+            if (window.DEBUG_GODMODE && ai.attackTimer >= this.ATTACK_IMPACT_DELAY + 1.4) {
+                ai.isAttacking = false;
+            }
+
+            return; // durante l'attacco il mostro resta fermo, niente steering
         }
 
         // ── Condizione di Inseguimento ────────────────────────────────────────

@@ -8,6 +8,16 @@
  * appropriati. Nessuna logica di gameplay (collisioni, inventario, AI)
  * vive qui: solo "la magia dei movimenti".
  *
+ * ATTENZIONE (lezione imparata): lo "screen shake" NON deve mai toccare
+ * camera.rotation / camera.quaternion. I PointerLockControls calcolano la
+ * rotazione della camera partendo da un Euler con ordine 'YXZ' e la scrivono
+ * sul quaternion; scrivere direttamente camera.rotation.x/z (ordine 'XYZ' di
+ * default sull'Object3D) introduce un roll spurio che, ricombinato dai
+ * controls al giro di mouse successivo, fa "ribaltare"/inclinare la visuale
+ * in modo imprevedibile. Per questo lo shake è implementato come un
+ * transform CSS sul canvas (renderer.domElement): visivamente identico,
+ * ma completamente disaccoppiato dalla matematica di Three.js/PointerLockControls.
+ *
  * EVENTI ASCOLTATI (emessi da PlayerController / LightingSetup / main.js):
  *   - 'itemRaccolto'      → l'oggetto raccolto vola via, ruota e scompare
  *   - 'horrorTrigger'     → jumpscare: flash rosso + screen shake (CSS)
@@ -188,8 +198,8 @@ export class TweenManager {
             const baseAngle    = torcia.userData._baseAngle;
             const baseDistance = torcia.userData._baseDistance;
 
-            const MIN_ANGLE_FACTOR    = 0.70; // a batteria quasi scarica: 35% dell'apertura originale
-            const MIN_DISTANCE_FACTOR = 0.70; // e 45% della portata originale
+            const MIN_ANGLE_FACTOR    = 0.35; // a batteria quasi scarica: 35% dell'apertura originale
+            const MIN_DISTANCE_FACTOR = 0.45; // e 45% della portata originale
 
             const targetAngle    = baseAngle    * (MIN_ANGLE_FACTOR    + norm * (1 - MIN_ANGLE_FACTOR));
             const targetDistance = baseDistance * (MIN_DISTANCE_FACTOR + norm * (1 - MIN_DISTANCE_FACTOR));

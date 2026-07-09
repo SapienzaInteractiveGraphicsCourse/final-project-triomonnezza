@@ -620,6 +620,83 @@ export class MapBase {
     }
 
     /**
+     * Batteria di ricarica per la torcia (Regista).
+     * Stessa filosofia della chiave: geometria procedurale (nessun asset
+     * .glb esterno), resa interattiva col tasto E tramite lo stesso sistema
+     * generico già usato per le chiavi (tipo:'chiave' + idChiave univoco),
+     * così non serve toccare PlayerController.js.
+     *
+     * @param {THREE.Vector3} position - dove posizionarla (solo x/z contano,
+     *                                    l'altezza è fissata per leggibilità)
+     * @param {string} id - identificativo univoco (es. 'batteria_1'); main.js
+     *                      lo usa per distinguere "batteria" da "chiave normale"
+     */
+    spawnBattery(position, id) {
+        const bodyMat = new THREE.MeshStandardMaterial({
+            color: 0x2a2a2a, metalness: 0.6, roughness: 0.35,
+        });
+        const stripeMat = new THREE.MeshStandardMaterial({
+            color: 0x2ecc71, metalness: 0.2, roughness: 0.4,
+            emissive: 0x2ecc71, emissiveIntensity: 0.6,
+        });
+        const capMat = new THREE.MeshStandardMaterial({
+            color: 0xd4af37, metalness: 1.0, roughness: 0.15,
+        });
+
+        const group = new THREE.Group();
+
+        // Corpo cilindrico principale
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.32, 16), bodyMat);
+        group.add(body);
+
+        // Fascia verde centrale (riconoscibile a distanza/al buio)
+        const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.113, 0.113, 0.08, 16), stripeMat);
+        group.add(stripe);
+
+        // Terminale positivo dorato
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.06, 12), capMat);
+        cap.position.y = 0.19;
+        group.add(cap);
+
+        // Glow verde (tema "energia", distinguibile dal glow dorato della chiave)
+        const glow = new THREE.PointLight(0x2ecc71, 4.0, 5);
+        glow.position.y = 0.05;
+        group.add(glow);
+
+        group.position.copy(position);
+        group.position.y = 1.1; // altezza fissa, coerente con la chiave (1.3) ma diversa per distinguerle
+        group.rotation.z = Math.PI / 2; // sdraiata su un fianco, più leggibile come oggetto raccoglibile
+        group.scale.setScalar(1.15);
+
+        group.traverse(child => {
+            if (child.isMesh) {
+                child.userData = {
+                    isInteractive: true,
+                    tipo: 'chiave', // riusa il sistema di raccolta generico già esistente (tasto E)
+                    idChiave: id,
+                    nome: 'Pick Up Battery', // sovrascrive il prompt di default "Pick Up Golden Key"
+                };
+            }
+        });
+
+        this.scene.add(group);
+        if (!this._batteryGroups) this._batteryGroups = [];
+        // Fase iniziale randomica: le batterie non "pulsano" tutte in sincrono
+        this._batteryGroups.push({ group, time: Math.random() * Math.PI * 2, id });
+        return group;
+    }
+
+    /**
+     * Rimuove il tracking di una batteria raccolta (main.js la chiama dopo
+     * l'evento itemRaccolto). Non serve rimuovere l'oggetto dalla scena qui:
+     * ci pensa già TweenManager con l'animazione di raccolta.
+     */
+    removeBattery(id) {
+        if (!this._batteryGroups) return;
+        this._batteryGroups = this._batteryGroups.filter(b => b.id !== id);
+    }
+
+    /**
      * Spawna la porta del goal: pannello scuro con cornice dorata + lucchetto.
      * Visivamente distinta dalle porte dei corridoi (hinged door).
      * Interattiva con tipo 'porta_goal'. Premere E con la chiave → vittoria.
@@ -747,6 +824,16 @@ export class MapBase {
             this._goalKeyTime = (this._goalKeyTime || 0) + deltaTime;
             this._goalKeyGroup.rotation.y = this._goalKeyTime * 2.0;
             this._goalKeyGroup.position.y = 1.3 + Math.sin(this._goalKeyTime * 2.2) * 0.12;
+        }
+
+        // Animazione batterie: stessa idea della chiave (rotazione + galleggiamento),
+        // ognuna con la propria fase per non "pulsare" tutte in sincrono.
+        if (this._batteryGroups && this._batteryGroups.length) {
+            for (const b of this._batteryGroups) {
+                b.time += deltaTime;
+                b.group.rotation.x = b.time * 1.6;
+                b.group.position.y = 1.1 + Math.sin(b.time * 2.0) * 0.1;
+            }
         }
 
         // ── Aura reattiva alla torcia sulla porta del goal ────────────────────
