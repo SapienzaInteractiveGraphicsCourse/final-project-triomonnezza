@@ -298,10 +298,10 @@ function updateTorchSway(deltaTime, fearFactor = 0) {
 
     // Ampiezze marcate durante il cammino, per un dondolio di mano ben
     // percepibile (non solo un lieve tremolio) — quasi il doppio di prima.
-    const bobAmount  = isWalking ? 0.09  : 0.012; // oscillazione verticale (su/giù ad ogni passo)
-    const swayAmount = isWalking ? 0.075 : 0.008; // oscillazione laterale (sx/dx ad ogni passo)
-    const pushAmount = isWalking ? 0.035 : 0.0;   // leggera spinta avanti ad ogni passo
-    const tiltAmount = isWalking ? 0.06  : 0.015; // inclinazione (roll) del modello visivo
+    const bobAmount  = isWalking ? 0.12  : 0.012; // oscillazione verticale (su/giù ad ogni passo)
+    const swayAmount = isWalking ? 0.08 : 0.008; // oscillazione laterale (sx/dx ad ogni passo)
+    const pushAmount = isWalking ? 0.05 : 0.0;   // leggera spinta avanti ad ogni passo
+    const tiltAmount = isWalking ? 0.15  : 0.015; // inclinazione (roll) del modello visivo
 
     const bobY  = Math.sin(_torchSwayTime * 2) * bobAmount;
     const swayX = Math.cos(_torchSwayTime)     * swayAmount;
