@@ -41,12 +41,9 @@ const monster = new Monster();
 // ── Batteria torcia (Regista) ─────────────────────────────────────
 // Si scarica gradualmente nel tempo fino a un minimo (mai si spegne del
 // tutto). Implementata come moltiplicatore applicato SOPRA l'intensità
-// che PlayerController calcola ogni frame (incluso il suo sfarfallio
-// casuale) — MAI scrivendo light.intensity direttamente da qui, altrimenti
-// i due sistemi si sovrascriverebbero a vicenda in modo imprevedibile
-// (stesso tipo di conflitto già visto con la camera).
+// che PlayerController calcola ogni frame (incluso il suo sfarfallio casuale)
 const TORCH_BATTERY_MIN_PERCENT = 30;  // percentuale minima di luce residua
-const TORCH_DRAIN_INTERVAL_SEC  = 8;   // ogni quanti secondi perde l'1%
+const TORCH_DRAIN_INTERVAL_SEC  = 1;   // ogni quanti secondi perde l'1%
 let torchBatteryPercent = 100;
 let _torchDrainTimer = 0;
 const _torchBatteryMult = { mult: 1.0 }; // valore animato in tween, applicato ogni frame
