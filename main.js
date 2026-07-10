@@ -9,6 +9,7 @@ import { DoorController }        from './src/core/DoorController.js';
 import { FlashlightController }  from './src/core/FlashlightController.js';
 import { TweenManager }          from './src/animations/TweenManager.js';
 import { generateBloodSplatter } from './src/ui/BloodSplatter.js';
+import { MonsterAI }             from './src/core/MonsterAI.js';
 import * as TWEEN from '@tweenjs/tween.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ scene.add(dirLight);
 let currentMap  = null;
 let player      = null;
 let mostroMesh  = null;
+let monsterAI   = null;
 const monster   = new Monster();
 
 // Cosmetic tween manager (screen shake, item pickup fly-away, etc.)
@@ -106,6 +108,8 @@ document.addEventListener('startGameEvent', async (e) => {
 
         player = new PlayerController(camera, renderer.domElement, collisionBoxes, triggerZones);
         flashCtrl.setPlayer(player);
+
+        monsterAI = new MonsterAI(mostroMesh, camera, currentMap.getMonsterCollisionBoxes(), currentMap.getDoors());
 
         document.dispatchEvent(new Event('assetsLoadedEvent'));
 
@@ -310,7 +314,12 @@ function animate() {
             // BGM crossfade based on monster proximity
             AudioSystem.setBGMState(distanza <= farEdge ? 'ambience' : 'doom');
 
-            // Monster AI
+            // Monster AI logic (movement, raycasting, doors, attack triggers)
+            if (monsterAI) {
+                monsterAI.update(deltaTime);
+            }
+
+            // Monster animation
             const isMoving = player.controls.isLocked
                 && distanza <= farEdge
                 && distanza > nearEdge;
