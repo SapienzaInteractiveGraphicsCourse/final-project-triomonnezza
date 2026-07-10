@@ -46,7 +46,7 @@ const monster = new Monster();
 // i due sistemi si sovrascriverebbero a vicenda in modo imprevedibile
 // (stesso tipo di conflitto già visto con la camera).
 const TORCH_BATTERY_MIN_PERCENT = 30;  // percentuale minima di luce residua
-const TORCH_DRAIN_INTERVAL_SEC  = 5;   // ogni quanti secondi perde l'1% (valore di test scelto dall'utente)
+const TORCH_DRAIN_INTERVAL_SEC  = 4;   // ogni quanti secondi perde l'1% (valore di test scelto dall'utente)
 let torchBatteryPercent = 100;
 let _torchDrainTimer = 0;
 const _torchBatteryMult = { mult: 1.0 }; // valore animato in tween, applicato ogni frame
@@ -96,6 +96,8 @@ document.addEventListener('startGameEvent', async (e) => {
     _torchBatteryMult.mult = 1.0;
     _flickerStepTimer = 0;
     _flickerCurrentMult = 1.0;
+    _fearFlickerStepTimer = 0;
+    _fearFlickerCurrentMult = 1.0;
     _fearOscTime = 0;
 
     // Crea la mappa giusta
@@ -828,6 +830,43 @@ function computeLowBatteryFlickerMult(deltaTime, percent) {
 }
 
 // ==========================================
+// SFARFALLIO DA "INTERFERENZA" — PAURA (Regista)
+// Si AGGIUNGE (non sostituisce) al movimento scattoso del fascio quando il
+// mostro è vicino: un lieve sfarfallio dell'intensità dà l'idea di
+// un'interferenza elettronica, come se la presenza del mostro disturbasse
+// la torcia — non "la torcia sta morendo" (quello è il flicker da
+// batteria sopra), qui è più contenuto e si innesca solo quando la paura
+// è genuinamente presente (fearFactor oltre una soglia minima).
+// ==========================================
+const FEAR_FLICKER_THRESHOLD = 0.15; // sotto questa soglia di paura, niente sfarfallio
+let _fearFlickerStepTimer = 0;
+let _fearFlickerCurrentMult = 1.0;
+
+function computeFearInterferenceFlickerMult(deltaTime, fearFactor) {
+    if (fearFactor < FEAR_FLICKER_THRESHOLD) {
+        _fearFlickerCurrentMult = 1.0;
+        return 1.0;
+    }
+
+    // intensity: 0 appena sopra soglia → 1 quando il mostro è vicinissimo
+    const intensity = Math.min(1, Math.max(0,
+        (fearFactor - FEAR_FLICKER_THRESHOLD) / (1 - FEAR_FLICKER_THRESHOLD)
+    ));
+
+    const flickerFreqHz = 2 + intensity * 8;    // da ~2 a ~10 scatti al secondo — più nervoso di un flicker regolare
+    const flickerDepth  = 0.15 + intensity * 0.2; // calo modesto (15%-35%): "interferenza", non un blackout
+
+    _fearFlickerStepTimer += deltaTime;
+    const stepDuration = 1 / flickerFreqHz;
+    if (_fearFlickerStepTimer >= stepDuration) {
+        _fearFlickerStepTimer = 0;
+        _fearFlickerCurrentMult = Math.random() < 0.5 ? (1 - flickerDepth) : 1.0;
+    }
+
+    return _fearFlickerCurrentMult;
+}
+
+// ==========================================
 // 4c. BATTERIA TORCIA — si scarica nel tempo (Regista)
 // Timer indipendente da PlayerController: decrementa la percentuale a step
 // di 1%, poi notifica il TweenManager che anima morbidamente il nuovo
@@ -918,7 +957,8 @@ function animate() {
         // (vedi updateTorchSway/fearFactor qui sopra).
         if (player.flashlight) {
             const batteryFlickerMult = computeLowBatteryFlickerMult(deltaTime, torchBatteryPercent);
-            player.flashlight.intensity *= _torchBatteryMult.mult * batteryFlickerMult;
+            const fearFlickerMult    = computeFearInterferenceFlickerMult(deltaTime, fearFactor);
+            player.flashlight.intensity *= _torchBatteryMult.mult * batteryFlickerMult * fearFlickerMult;
         }
 
         const isMoving = player.controls.isLocked
