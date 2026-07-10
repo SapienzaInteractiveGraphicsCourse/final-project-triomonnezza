@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -301,7 +301,7 @@
             top: 0; left: 0; height: 100%;
             width: 0%;
             background: var(--crimson);
-            transition: width 0.1s steps(10);
+            transition: width 0.3s ease-out;
         }
         #loading-text {
             margin-top: 20px;
@@ -408,7 +408,7 @@
         </div>
     </div>
 
-    <div id="loading-screen" class="overlay-screen" style="display: none;">
+    <div id="loading-screen" class="overlay-screen" style="display: none; background: #000; opacity: 1; z-index: 99999;">
         <h2 class="pulse-text">DESCENDING...</h2>
         <div class="loading-bar-container">
             <div id="loading-bar-fill"></div>

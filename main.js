@@ -1,4 +1,4 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import { PlayerController } from './src/core/PlayerController.js';
 import { Monster } from './src/entities/Monster.js';
 import { MapEasy } from './src/world/maps/MapEasy.js';
@@ -143,9 +143,6 @@ document.addEventListener('startGameEvent', async (e) => {
         camera.add(AudioSystem.listener); // Add listener to camera
         player = new PlayerController(camera, renderer.domElement, collisionBoxes, triggerZones);
 
-        // Start BGM
-        AudioSystem.startBGM();
-
         // Tutto pronto: nascondi loading, mostra istruzioni
         document.dispatchEvent(new Event('assetsLoadedEvent'));
 
@@ -158,6 +155,16 @@ document.addEventListener('startGameEvent', async (e) => {
 // ==========================================
 // 4. ASCOLTO EVENTI DI GIOCO
 // ==========================================
+let bgmStarted = false;
+document.addEventListener('pointerlockchange', () => {
+    if (player && player.controls.isLocked && !bgmStarted) {
+        AudioSystem.startBGM();
+        bgmStarted = true;
+    }
+});
+document.addEventListener('startGameEvent', () => {
+    bgmStarted = false;
+});
 document.addEventListener('uiTargetChanged', (e) => {
     if (e.detail.name) console.log(`[UI]: Mirino su -> ${e.detail.name}`);
 });
@@ -932,47 +939,49 @@ function animate() {
     if (player && mostroMesh) {
         player.update(deltaTime, mostroMesh);
 
-        // Distanza dal mostro e "fattore paura" calcolati subito, così sia il
-        // dondolio della torcia sia il flicker della luce (più sotto) sia
-        // BGM/AI possono usarli.
-        const targetVector = new THREE.Vector3().subVectors(camera.position, mostroMesh.position);
-        targetVector.y = 0;
-        const distanza = targetVector.length();
+        if (player.controls.isLocked) {
+            // Distanza dal mostro e "fattore paura" calcolati subito, così sia il
+            // dondolio della torcia sia il flicker della luce (più sotto) sia
+            // BGM/AI possono usarli.
+            const targetVector = new THREE.Vector3().subVectors(camera.position, mostroMesh.position);
+            targetVector.y = 0;
+            const distanza = targetVector.length();
 
-        let fearFactor = 0;
-        if (player.mostroAggroRadius) {
-            const farEdge = player.mostroAggroRadius;
-            const nearEdge = player.mostroAttackRadius || 2.5;
-            fearFactor = 1 - Math.min(1, Math.max(0, (distanza - nearEdge) / (farEdge - nearEdge)));
+            let fearFactor = 0;
+            if (player.mostroAggroRadius) {
+                const farEdge = player.mostroAggroRadius;
+                const nearEdge = player.mostroAttackRadius || 2.5;
+                fearFactor = 1 - Math.min(1, Math.max(0, (distanza - nearEdge) / (farEdge - nearEdge)));
+            }
+
+            updateTorchSway(deltaTime, fearFactor);
+            updateTorchBattery(deltaTime);
+            updateSprintFOV(deltaTime);
+
+            // Applica il calo batteria SOPRA l'intensità che PlayerController ha
+            // appena calcolato per questo frame (base + eventuale sfarfallio).
+            // Va fatto qui, dopo player.update(), altrimenti verrebbe sovrascritto.
+            // NB: la paura NON tocca l'intensità — muove solo la mira del fascio
+            // (vedi updateTorchSway/fearFactor qui sopra).
+            if (player.flashlight) {
+                const batteryFlickerMult = computeLowBatteryFlickerMult(deltaTime, torchBatteryPercent);
+                const fearFlickerMult = computeFearInterferenceFlickerMult(deltaTime, fearFactor);
+                player.flashlight.intensity *= _torchBatteryMult.mult * batteryFlickerMult * fearFlickerMult;
+            }
+
+            const isMoving = player.controls.isLocked
+                && distanza <= player.mostroAggroRadius
+                && distanza > (player.mostroAttackRadius || 2.5);
+
+            // Manage BGM state based on distance
+            if (distanza <= player.mostroAggroRadius) {
+                AudioSystem.setBGMState('ambience');
+            } else {
+                AudioSystem.setBGMState('doom');
+            }
+
+            monster.update(deltaTime, isMoving);
         }
-
-        updateTorchSway(deltaTime, fearFactor);
-        updateTorchBattery(deltaTime);
-        updateSprintFOV(deltaTime);
-
-        // Applica il calo batteria SOPRA l'intensità che PlayerController ha
-        // appena calcolato per questo frame (base + eventuale sfarfallio).
-        // Va fatto qui, dopo player.update(), altrimenti verrebbe sovrascritto.
-        // NB: la paura NON tocca l'intensità — muove solo la mira del fascio
-        // (vedi updateTorchSway/fearFactor qui sopra).
-        if (player.flashlight) {
-            const batteryFlickerMult = computeLowBatteryFlickerMult(deltaTime, torchBatteryPercent);
-            const fearFlickerMult = computeFearInterferenceFlickerMult(deltaTime, fearFactor);
-            player.flashlight.intensity *= _torchBatteryMult.mult * batteryFlickerMult * fearFlickerMult;
-        }
-
-        const isMoving = player.controls.isLocked
-            && distanza <= player.mostroAggroRadius
-            && distanza > (player.mostroAttackRadius || 2.5);
-
-        // Manage BGM state based on distance
-        if (distanza <= player.mostroAggroRadius) {
-            AudioSystem.setBGMState('ambience');
-        } else {
-            AudioSystem.setBGMState('doom');
-        }
-
-        monster.update(deltaTime, isMoving);
     }
 
     if (currentMap && currentMap.update) {
