@@ -14,7 +14,6 @@ export const interiorTiles = [
     // Plaster (Default / MapMedium)
     'floorTiles.glb',
     'ceilingPlaster.glb',
-    'ceilingLight.glb',
     'wallPlaster.glb',
     'wallDoorPlaster.glb',
     'wallTiles.glb',
@@ -54,12 +53,14 @@ export const interiorProps = [
     'table2.glb',
     'tableSmall.glb',
     'tableSmall2.glb',
+    'tableSmall3.glb',
 
     // Storage
     'bookshelf.glb',
     'cabinet.glb',
-    'cabinetHigh.glb',
+    // cabinetHigh.glb intentionally not preloaded: broken source pivot, see PropScale.js
     'cabinetLow.glb',
+    'cabinetSink.glb',
     'sideboard.glb',
     'sideboard2.glb',
     'shelves.glb',
@@ -75,6 +76,8 @@ export const interiorProps = [
     'mirror2.glb',
     'clock.glb',
     'wallLight.glb',
+    // ceilingLight.glb lives in props/, not geometry/ — used by spawnCeilingLamp
+    'ceilingLight.glb',
 
     // Electronics / appliances
     'radio.glb',
@@ -82,6 +85,7 @@ export const interiorProps = [
     'tv.glb',
     'lamp.glb',
     'tableLamp.glb',
+    'fridge.glb',
 
     // Bathroom
     'bathroomSink.glb',

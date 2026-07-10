@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { PlayerController } from './src/core/PlayerController.js';
 import { Monster } from './src/entities/Monster.js';
 import { MapEasy } from './src/world/maps/MapEasy.js';
@@ -22,7 +22,7 @@ renderer.shadowMap.enabled = false; // Disabilitato per performance (gioco horro
 document.body.appendChild(renderer.domElement);
 
 // Luce ambientale minima — solo per evitare nero assoluto; le lampade al soffitto sono le vere fonti di luce
-const ambientLight = new THREE.AmbientLight(0x111122, 0.06);
+const ambientLight = new THREE.AmbientLight(0x333344, 0.15);
 scene.add(ambientLight);
 
 // Luce direzionale minima — solo per definizione volumetrica di base
@@ -46,7 +46,7 @@ const monster = new Monster();
 // i due sistemi si sovrascriverebbero a vicenda in modo imprevedibile
 // (stesso tipo di conflitto già visto con la camera).
 const TORCH_BATTERY_MIN_PERCENT = 30;  // percentuale minima di luce residua
-const TORCH_DRAIN_INTERVAL_SEC  = 4;   // ogni quanti secondi perde l'1% (valore di test scelto dall'utente)
+const TORCH_DRAIN_INTERVAL_SEC = 2;   // ogni quanti secondi perde l'1% (valore di test scelto dall'utente)
 let torchBatteryPercent = 100;
 let _torchDrainTimer = 0;
 const _torchBatteryMult = { mult: 1.0 }; // valore animato in tween, applicato ogni frame
@@ -101,9 +101,9 @@ document.addEventListener('startGameEvent', async (e) => {
     _fearOscTime = 0;
 
     // Crea la mappa giusta
-    if (difficulty === 'easy')        currentMap = new MapEasy(scene);
+    if (difficulty === 'easy') currentMap = new MapEasy(scene);
     else if (difficulty === 'medium') currentMap = new MapMedium(scene);
-    else if (difficulty === 'hard')   currentMap = new MapHard(scene);
+    else if (difficulty === 'hard') currentMap = new MapHard(scene);
     else return;
 
     try {
@@ -114,7 +114,7 @@ document.addEventListener('startGameEvent', async (e) => {
         ]);
 
         const collisionBoxes = currentMap.getCollisionBoxes();
-        const triggerZones   = currentMap.getTriggerZones();
+        const triggerZones = currentMap.getTriggerZones();
 
         // Spawn mostro
         mostroMesh = monster.getMesh();
@@ -122,7 +122,7 @@ document.addEventListener('startGameEvent', async (e) => {
         mostroMesh.position.copy(spawnPos);
         mostroMesh.traverse((child) => {
             if (child.isMesh) {
-                child.castShadow    = true;
+                child.castShadow = true;
                 child.receiveShadow = true;
             }
         });
@@ -132,7 +132,7 @@ document.addEventListener('startGameEvent', async (e) => {
         // Posiziona camera e crea controller
         const playerSpawn = currentMap.getPlayerSpawn();
         camera.position.copy(playerSpawn);
-        
+
         if (currentMap.getPlayerRotationY) {
             const rotY = currentMap.getPlayerRotationY();
             camera.rotation.set(0, rotY, 0);
@@ -213,7 +213,7 @@ document.addEventListener('portaAperta', (e) => {
     if (!hinge.userData.isOpen && hinge.userData.isAnimating) return;
 
     const wasOpen = hinge.userData.isOpen;
-    hinge.userData.isOpen     = !wasOpen;
+    hinge.userData.isOpen = !wasOpen;
     hinge.userData.isAnimating = true;
 
     if (wasOpen) {
@@ -229,7 +229,7 @@ document.addEventListener('portaAperta', (e) => {
             );
         }
 
-        const targetY    = hinge.userData.startRotationY;
+        const targetY = hinge.userData.startRotationY;
         const overshootY = targetY - 0.07; // rimbalza OLTRE il chiuso, in modo più marcato — sbatte forte contro lo stipite
 
         const swing = new TWEEN.Tween(hinge.rotation)
@@ -292,9 +292,9 @@ document.addEventListener('portaAperta', (e) => {
         // visivamente aperta a sufficienza (circa metà dello swing).
         const doorOpenClearanceDelay = 220 + 2200 * 0.45; // ~1210ms: attrito + ~45% dello swing
 
-        const baseY      = hinge.userData.startRotationY;
-        const targetY    = baseY + (Math.PI / 2);
-        const stickY     = baseY + (targetY - baseY) * 0.035; // micro-movimento: vince l'attrito iniziale
+        const baseY = hinge.userData.startRotationY;
+        const targetY = baseY + (Math.PI / 2);
+        const stickY = baseY + (targetY - baseY) * 0.035; // micro-movimento: vince l'attrito iniziale
 
         const stick = new TWEEN.Tween(hinge.rotation)
             .to({ y: stickY }, 220)
@@ -470,17 +470,17 @@ function _makeBloodBlast(topVh, leftVw, sizeVw) {
     const el = document.createElement('div');
     el.className = 'blood-blob';
     el.style.position = 'absolute';
-    el.style.top    = `${topVh}vh`;
-    el.style.left   = `${leftVw}vw`;
-    el.style.width  = `${sizeVw.toFixed(1)}vw`;
+    el.style.top = `${topVh}vh`;
+    el.style.left = `${leftVw}vw`;
+    el.style.width = `${sizeVw.toFixed(1)}vw`;
     el.style.height = `${(sizeVw * _randRange(0.8, 1.2)).toFixed(1)}vw`;
     el.style.borderRadius = _randomBorderRadius();
     el.style.transform = `rotate(${_randRange(-40, 40).toFixed(0)}deg)`;
 
     // Sfumatura radiale con punto luce spostato: dà l'effetto "bagnato/lucido"
     const light = _randomBloodColor();
-    const mid   = _randomBloodColor();
-    const dark  = _randomBloodColor();
+    const mid = _randomBloodColor();
+    const dark = _randomBloodColor();
     el.style.background = `radial-gradient(circle at ${Math.round(_randRange(25, 45))}% ${Math.round(_randRange(25, 45))}%, ${light} 0%, ${mid} 65%, ${dark} 100%)`;
 
     // Gocce sparse attorno al blob principale, via box-shadow: tecnica
@@ -488,9 +488,9 @@ function _makeBloodBlast(topVh, leftVw, sizeVw) {
     const dropletCount = 3 + Math.floor(Math.random() * 4);
     const shadows = [];
     for (let i = 0; i < dropletCount; i++) {
-        const dx     = _randRange(-9, 9).toFixed(1);
-        const dy     = _randRange(-9, 9).toFixed(1);
-        const blur   = _randRange(0, 1.5).toFixed(1);
+        const dx = _randRange(-9, 9).toFixed(1);
+        const dy = _randRange(-9, 9).toFixed(1);
+        const blur = _randRange(0, 1.5).toFixed(1);
         const spread = -_randRange(1.5, 3.5).toFixed(1);
         shadows.push(`${dx}vw ${dy}vh ${blur}px ${spread}px ${_randomBloodColor()}`);
     }
@@ -505,12 +505,12 @@ function _makeBloodDrip(topVh, leftVw) {
     el.className = 'blood-drip';
     el.style.position = 'absolute';
 
-    const width  = _randRange(0.6, 1.8);  // vw
+    const width = _randRange(0.6, 1.8);  // vw
     const height = _randRange(8, 22);     // vh
 
-    el.style.top    = `${topVh.toFixed(1)}vh`;
-    el.style.left   = `${leftVw.toFixed(1)}vw`;
-    el.style.width  = `${width.toFixed(1)}vw`;
+    el.style.top = `${topVh.toFixed(1)}vh`;
+    el.style.left = `${leftVw.toFixed(1)}vw`;
+    el.style.width = `${width.toFixed(1)}vw`;
     el.style.height = `${height.toFixed(1)}vh`;
     // Stondato in cima (attaccato alla macchia), assottigliato in fondo
     el.style.borderRadius = '50% 50% 45% 45% / 60% 60% 25% 25%';
@@ -527,7 +527,7 @@ function _makeBloodDrip(topVh, leftVw) {
     bead.style.position = 'absolute';
     bead.style.bottom = '2%';
     bead.style.left = '50%';
-    bead.style.width  = `${beadSize.toFixed(1)}vw`;
+    bead.style.width = `${beadSize.toFixed(1)}vw`;
     bead.style.height = `${(beadSize * 0.85).toFixed(1)}vw`;
     bead.style.transform = 'translateX(-50%)';
     bead.style.borderRadius = '50%';
@@ -545,8 +545,8 @@ function generateBloodSplatter() {
     // 5 schizzi principali, concentrati verso bordi/angoli — il centro
     // resta più leggibile, come vero sangue schizzato sulla lente/sugli occhi
     const positions = [
-        { top: _randRange(2, 20),  left: _randRange(2, 20) },
-        { top: _randRange(2, 18),  left: _randRange(78, 96) },
+        { top: _randRange(2, 20), left: _randRange(2, 20) },
+        { top: _randRange(2, 18), left: _randRange(78, 96) },
         { top: _randRange(75, 95), left: _randRange(2, 20) },
         { top: _randRange(75, 95), left: _randRange(75, 95) },
         { top: _randRange(80, 96), left: _randRange(38, 58) },
@@ -562,7 +562,7 @@ function generateBloodSplatter() {
             const dripCount = 1 + Math.floor(Math.random() * 2);
             for (let i = 0; i < dripCount; i++) {
                 const dripLeft = pos.left + _randRange(size * 0.15, size * 0.7);
-                const dripTop  = pos.top + size * 0.55;
+                const dripTop = pos.top + size * 0.55;
                 container.appendChild(_makeBloodDrip(dripTop, dripLeft));
             }
         }
@@ -611,7 +611,7 @@ document.addEventListener('playerMorto', () => {
 document.addEventListener('pointerlockchange', () => {
     if (!player) return;
     const locked = document.pointerLockElement === document.body
-                || document.pointerLockElement?.tagName === 'CANVAS';
+        || document.pointerLockElement?.tagName === 'CANVAS';
     if (locked) {
         AudioSystem.playSound('close_menu');
     } else {
@@ -659,7 +659,7 @@ let _fearOscTime = 0;
 function updateTorchSway(deltaTime, fearFactor = 0) {
     if (!player || !player.flashlight) return;
 
-    const isWalking   = player.controls.isLocked &&
+    const isWalking = player.controls.isLocked &&
         (player.keys.forward || player.keys.backward || player.keys.left || player.keys.right);
     const isSprinting = isWalking && player.isSprinting;
 
@@ -674,28 +674,28 @@ function updateTorchSway(deltaTime, fearFactor = 0) {
 
     if (isSprinting) {
         // Corsa: molto mossa, poco controllata -- basta che illumini davanti
-        timeSpeed  = 11.0;
-        bobAmount  = 0.16;  swayAmount = 0.13;
-        pushAmount = 0.05;  tiltAmount = 0.11;
-        aimMult    = 2.3;
+        timeSpeed = 11.0;
+        bobAmount = 0.16; swayAmount = 0.13;
+        pushAmount = 0.05; tiltAmount = 0.11;
+        aimMult = 2.3;
     } else if (isWalking) {
         // Camminata: dondolio ben evidente, come un braccio che accompagna il passo
-        timeSpeed  = 6.5;
-        bobAmount  = 0.09;  swayAmount = 0.075;
+        timeSpeed = 6.5;
+        bobAmount = 0.09; swayAmount = 0.075;
         pushAmount = 0.035; tiltAmount = 0.06;
-        aimMult    = 1.8;
+        aimMult = 1.8;
     } else {
         // Fermi: oscillazione minima ma percepibile, sinusoidale e lieve
-        timeSpeed  = 1.3;
-        bobAmount  = 0.018; swayAmount = 0.015;
-        pushAmount = 0.0;   tiltAmount = 0.02;
-        aimMult    = 1.5;
+        timeSpeed = 1.3;
+        bobAmount = 0.018; swayAmount = 0.015;
+        pushAmount = 0.0; tiltAmount = 0.02;
+        aimMult = 1.5;
     }
 
     _torchSwayTime += deltaTime * timeSpeed;
 
-    const bobY  = Math.sin(_torchSwayTime * 2) * bobAmount;
-    const swayX = Math.cos(_torchSwayTime)     * swayAmount;
+    const bobY = Math.sin(_torchSwayTime * 2) * bobAmount;
+    const swayX = Math.cos(_torchSwayTime) * swayAmount;
     const pushZ = Math.abs(Math.sin(_torchSwayTime * 2)) * pushAmount;
 
     // Il fascio (target) usa una fase leggermente sfasata sull'asse verticale
@@ -716,19 +716,19 @@ function updateTorchSway(deltaTime, fearFactor = 0) {
 
     const fearAmp = fearFactor * fearFactor; // cresce di piu quando il mostro e VICINO (curva quadratica)
 
-    const oscX = Math.sin(_fearOscTime * 2.2)       * 0.6 + Math.sin(_fearOscTime * 5.3 + 1.7) * 0.4;
-    const oscY = Math.cos(_fearOscTime * 1.8 + 0.5) * 0.6 + Math.cos(_fearOscTime * 4.6)        * 0.4;
+    const oscX = Math.sin(_fearOscTime * 2.2) * 0.6 + Math.sin(_fearOscTime * 5.3 + 1.7) * 0.4;
+    const oscY = Math.cos(_fearOscTime * 1.8 + 0.5) * 0.6 + Math.cos(_fearOscTime * 4.6) * 0.4;
 
-    const FEAR_AIM_MAX_OFFSET   = 0.5;   // il FASCIO si muove tanto quando la paura e massima
+    const FEAR_AIM_MAX_OFFSET = 0.5;   // il FASCIO si muove tanto quando la paura e massima
     const FEAR_TORCH_MAX_OFFSET = 0.035; // la TORCIA fisica trema molto meno
 
-    const fearAimX   = oscX * fearAmp * FEAR_AIM_MAX_OFFSET;
-    const fearAimY   = oscY * fearAmp * FEAR_AIM_MAX_OFFSET;
+    const fearAimX = oscX * fearAmp * FEAR_AIM_MAX_OFFSET;
+    const fearAimY = oscY * fearAmp * FEAR_AIM_MAX_OFFSET;
     const fearTorchX = oscX * fearAmp * FEAR_TORCH_MAX_OFFSET;
     const fearTorchY = oscY * fearAmp * FEAR_TORCH_MAX_OFFSET;
 
     const totalX = swayX + fearTorchX;
-    const totalY = bobY  + fearTorchY;
+    const totalY = bobY + fearTorchY;
 
     // Applica l'offset in modo relativo alla posizione base "di riposo" di
     // ogni oggetto (memorizzata al primo frame utile), cosi l'effetto resta
@@ -817,7 +817,7 @@ function computeLowBatteryFlickerMult(deltaTime, percent) {
     ));
 
     const flickerFreqHz = 3 + severity * 15;   // da ~3 a ~18 scatti al secondo
-    const flickerDepth  = 0.3 + severity * 0.6; // da un calo lieve a un calo drastico
+    const flickerDepth = 0.3 + severity * 0.6; // da un calo lieve a un calo drastico
 
     _flickerStepTimer += deltaTime;
     const stepDuration = 1 / flickerFreqHz;
@@ -854,7 +854,7 @@ function computeFearInterferenceFlickerMult(deltaTime, fearFactor) {
     ));
 
     const flickerFreqHz = 2 + intensity * 8;    // da ~2 a ~10 scatti al secondo — più nervoso di un flicker regolare
-    const flickerDepth  = 0.15 + intensity * 0.2; // calo modesto (15%-35%): "interferenza", non un blackout
+    const flickerDepth = 0.15 + intensity * 0.2; // calo modesto (15%-35%): "interferenza", non un blackout
 
     _fearFlickerStepTimer += deltaTime;
     const stepDuration = 1 / flickerFreqHz;
@@ -877,7 +877,7 @@ function computeFearInterferenceFlickerMult(deltaTime, fearFactor) {
 // Il campo visivo si allarga leggermente durante lo sprint (sensazione di
 // velocità, classico effetto FPS), per poi tornare normale quando ci si ferma.
 // ==========================================
-const CAMERA_BASE_FOV   = 75; // deve combaciare col valore usato in new THREE.PerspectiveCamera(...)
+const CAMERA_BASE_FOV = 75; // deve combaciare col valore usato in new THREE.PerspectiveCamera(...)
 const CAMERA_SPRINT_FOV = 84;
 let _currentFov = CAMERA_BASE_FOV;
 
@@ -941,7 +941,7 @@ function animate() {
 
         let fearFactor = 0;
         if (player.mostroAggroRadius) {
-            const farEdge  = player.mostroAggroRadius;
+            const farEdge = player.mostroAggroRadius;
             const nearEdge = player.mostroAttackRadius || 2.5;
             fearFactor = 1 - Math.min(1, Math.max(0, (distanza - nearEdge) / (farEdge - nearEdge)));
         }
@@ -957,14 +957,14 @@ function animate() {
         // (vedi updateTorchSway/fearFactor qui sopra).
         if (player.flashlight) {
             const batteryFlickerMult = computeLowBatteryFlickerMult(deltaTime, torchBatteryPercent);
-            const fearFlickerMult    = computeFearInterferenceFlickerMult(deltaTime, fearFactor);
+            const fearFlickerMult = computeFearInterferenceFlickerMult(deltaTime, fearFactor);
             player.flashlight.intensity *= _torchBatteryMult.mult * batteryFlickerMult * fearFlickerMult;
         }
 
         const isMoving = player.controls.isLocked
             && distanza <= player.mostroAggroRadius
             && distanza > (player.mostroAttackRadius || 2.5);
-            
+
         // Manage BGM state based on distance
         if (distanza <= player.mostroAggroRadius) {
             AudioSystem.setBGMState('ambience');
@@ -992,6 +992,29 @@ window.addEventListener('resize', () => {
 
 // Click su instructions → sblocca puntatore (registrato una sola volta)
 document.getElementById('instructions').addEventListener('click', (e) => {
-    if (e.target.tagName === 'BUTTON') return;
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
+    // Also ignore clicks inside the settings div
+    if (e.target.closest('.settings')) return;
     if (player) player.controls.lock();
 });
+
+// Setup volume sliders
+const musicSlider = document.getElementById('music-volume');
+const sfxSlider = document.getElementById('sfx-volume');
+const musicVal = document.getElementById('music-vol-val');
+const sfxVal = document.getElementById('sfx-vol-val');
+
+if (musicSlider) {
+    musicSlider.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (musicVal) musicVal.innerText = val + '%';
+        AudioSystem.setMusicVolume(val / 100);
+    });
+}
+if (sfxSlider) {
+    sfxSlider.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (sfxVal) sfxVal.innerText = val + '%';
+        AudioSystem.setSfxVolume(val / 100);
+    });
+}

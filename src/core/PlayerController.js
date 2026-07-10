@@ -4,12 +4,21 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { AudioSystem } from './AudioSystem.js';
 
 export class PlayerController {
-    constructor(camera, domElement, collisionObjects, triggerZones) {
+    constructor(camera, domElement, collisionObjects, triggerZones, monsterCollisionObjects = null, doors = []) {
         this.camera = camera;
         this.domElement = domElement;
 
         // Input esterni passati dall'Artista (Studente B)
-        this.collisionObjects = collisionObjects; // Array di THREE.Box3 (muri/ostacoli)
+        this.collisionObjects = collisionObjects; // Array di THREE.Box3 (muri/ostacoli/arredamento) — usato dal giocatore
+        // Il mostro usa un set ridotto (solo muri/porte, niente arredamento):
+        // la sua AI di steering non fa vero pathfinding, solo ray-probing, e
+        // si incastrava tra i mobili delle stanze. Fallback al set completo
+        // se non passato (retro-compatibilità).
+        this.monsterCollisionObjects = monsterCollisionObjects || collisionObjects;
+        // Porte con anta interattiva (non la porta del goal): il mostro può
+        // aprirle da solo se bloccato, ma solo se chiuse da più di 3s dal
+        // giocatore (o mai toccate) — vedi _tryOpenNearbyDoors().
+        this.doors = doors;
         this.triggerZones = triggerZones;         // Array di oggetti { box: Box3, nome: string, giaAttivato: bool }
 
         // 1. Setup Controlli Cinematici (Pointer Lock)
@@ -255,31 +264,39 @@ export class PlayerController {
         this.controls.moveRight(-this.velocity.x * deltaTime);
         this.controls.moveForward(-this.velocity.z * deltaTime);
 
-        // 6. Verifica Collisioni per asse separato (sliding wall collision)
-        // Instead of a full rollback (which can teleport if oldPosition was already
-        // in a marginal overlap), we test X and Z independently so the player can
-        // slide along walls instead of being snapped to a potentially bad position.
-        if (this._checkCollisions()) {
-            // Try keeping Z, rolling back only X
-            const testXBack = oldPosition.clone();
-            testXBack.z = this.camera.position.z;
-            this.camera.position.copy(testXBack);
-            if (this._checkCollisions()) {
-                // X alone didn't help — try keeping X, rolling back only Z
-                const testZBack = new THREE.Vector3(
-                    this.camera.position.x,
-                    oldPosition.y,
-                    oldPosition.z
-                );
-                this.camera.position.copy(testZBack);
-                if (this._checkCollisions()) {
-                    // Both axes collide — full rollback
-                    this.camera.position.copy(oldPosition);
+        // 6. Risoluzione collisioni con scivolamento fluido (sliding wall collision)
+        // Invece di un rollback tutto-o-niente per asse, cerchiamo con una
+        // ricerca binaria la frazione massima del movimento del frame che è
+        // libera da collisioni, così il giocatore scivola fino quasi a
+        // toccare la superficie invece di essere "risucchiato" indietro di
+        // uno step intero (percepibile soprattutto durante lo scatto, dove
+        // un frame può coprire più di un'unità).
+        const desiredPosition = this.camera.position.clone();
+
+        if (this._checkCollisions(desiredPosition)) {
+            const directFraction = this._findSafeFraction(oldPosition, desiredPosition);
+            this.camera.position.lerpVectors(oldPosition, desiredPosition, directFraction);
+
+            if (directFraction < 0.02) {
+                // Il percorso diretto è bloccato quasi subito (es. muro/mobile
+                // preso di petto o in un angolo) — prova a scivolare lungo un
+                // solo asse per volta, anche qui con la stessa ricerca binaria.
+                const xOnly = new THREE.Vector3(desiredPosition.x, oldPosition.y, oldPosition.z);
+                const xFraction = this._findSafeFraction(oldPosition, xOnly);
+                const zOnly = new THREE.Vector3(oldPosition.x, oldPosition.y, desiredPosition.z);
+                const zFraction = this._findSafeFraction(oldPosition, zOnly);
+
+                if (xFraction >= zFraction && xFraction > 0.02) {
+                    this.camera.position.lerpVectors(oldPosition, xOnly, xFraction);
+                    this.velocity.z *= 0.15; // smorza invece di azzerare di scatto
+                } else if (zFraction > 0.02) {
+                    this.camera.position.lerpVectors(oldPosition, zOnly, zFraction);
+                    this.velocity.x *= 0.15;
                 } else {
-                    this.velocity.z = 0;
+                    this.camera.position.copy(oldPosition);
+                    this.velocity.x *= 0.15;
+                    this.velocity.z *= 0.15;
                 }
-            } else {
-                this.velocity.x = 0;
             }
         }
 
@@ -295,12 +312,30 @@ export class PlayerController {
         }
     }
 
-    // Rilevamento Intersezioni Assiali Box-to-Box (AABB Collision System)
-    _checkCollisions() {
-        const playerBox = new THREE.Box3().setFromCenterAndSize(
-            this.camera.position,
-            this.playerSize
+    // Costruisce l'AABB del giocatore che copre dal pavimento alla testa.
+    // NB: camera.position è all'altezza degli occhi (2.5), quindi un box
+    // centrato lì (come prima) galleggia tra y≈1.6 e y≈3.4 e non tocca mai
+    // il pavimento — i mobili (tavoli, sedie, comodini, ~1-1.8 unità) restano
+    // sempre sotto e non generano mai collisione. Il box va quindi ancorato
+    // al pavimento (y≈0.05) fino a poco sopra gli occhi, mantenendo la stessa
+    // impronta orizzontale (playerSize.x/z).
+    _getPlayerBox(pos = this.camera.position) {
+        const halfX = this.playerSize.x / 2;
+        const halfZ = this.playerSize.z / 2;
+        const feetY = 0.05;
+        const headY = pos.y + 0.15;
+        return new THREE.Box3(
+            new THREE.Vector3(pos.x - halfX, feetY, pos.z - halfZ),
+            new THREE.Vector3(pos.x + halfX, headY, pos.z + halfZ)
         );
+    }
+
+    // Rilevamento Intersezioni Assiali Box-to-Box (AABB Collision System).
+    // Accetta una posizione esplicita (default: quella attuale della camera)
+    // così da poter testare posizioni ipotetiche senza doverci spostare —
+    // usato dalla ricerca binaria in _findSafeFraction().
+    _checkCollisions(pos = this.camera.position) {
+        const playerBox = this._getPlayerBox(pos);
 
         for (let i = 0; i < this.collisionObjects.length; i++) {
             if (playerBox.intersectsBox(this.collisionObjects[i])) {
@@ -308,6 +343,25 @@ export class PlayerController {
             }
         }
         return false;
+    }
+
+    // Ricerca binaria della frazione massima (0..1) del segmento fromPos→toPos
+    // che è libera da collisioni. Usata per far scivolare il giocatore fino
+    // quasi a toccare una superficie invece di annullare l'intero spostamento
+    // del frame quando quest'ultimo risulta bloccato — con moveSpeed alti
+    // (scatto: 85/s) un singolo frame può coprire >1 unità, quindi un
+    // rollback "tutto o niente" si sentiva come uno scatto indietro brusco.
+    _findSafeFraction(fromPos, toPos, iterations = 6) {
+        if (!this._checkCollisions(toPos)) return 1;
+        if (this._checkCollisions(fromPos)) return 0; // già in collisione: non avanzare oltre
+        let lo = 0, hi = 1;
+        const testPos = new THREE.Vector3();
+        for (let i = 0; i < iterations; i++) {
+            const mid = (lo + hi) / 2;
+            testPos.lerpVectors(fromPos, toPos, mid);
+            if (this._checkCollisions(testPos)) hi = mid; else lo = mid;
+        }
+        return lo;
     }
 
     // Sensore Visivo: Proiezione del raggio centrale (Raycasting)
@@ -364,10 +418,7 @@ export class PlayerController {
     _checkTriggerZones() {
         if (!this.triggerZones) return;
 
-        const playerBox = new THREE.Box3().setFromCenterAndSize(
-            this.camera.position,
-            this.playerSize
-        );
+        const playerBox = this._getPlayerBox();
 
         for (let i = 0; i < this.triggerZones.length; i++) {
             const zone = this.triggerZones[i];
@@ -433,10 +484,12 @@ export class PlayerController {
      * Verifica se non ci sono muri/porte chiuse tra il mostro e il giocatore
      * (Regista): il mostro non deve poter "vedere"/colpire attraverso una
      * porta chiusa solo perché sei abbastanza vicino in linea d'aria.
-     * Riusa lo STESSO array di Box3 (collisionObjects) già usato per il
-     * movimento — quando una porta si apre il suo box viene "svuotato"
-     * (vedi main.js), quindi smette automaticamente di bloccare la vista
-     * senza bisogno di nessuna sincronizzazione aggiuntiva qui.
+     * Usa monsterCollisionObjects (muri/porte, NON l'arredamento) — coerente
+     * col fatto che il mostro attraversa fisicamente le decorazioni, quindi
+     * non ha senso che gli blocchino la vista/l'attacco.
+     * Quando una porta si apre il suo box viene "svuotato" (vedi main.js),
+     * quindi smette automaticamente di bloccare la vista senza bisogno di
+     * nessuna sincronizzazione aggiuntiva qui.
      */
     _hasLineOfSightToPlayer(mostroMesh) {
         const from = mostroMesh.position.clone();
@@ -451,8 +504,8 @@ export class PlayerController {
         const ray = new THREE.Ray(from, dir);
         const hitPoint = new THREE.Vector3();
 
-        for (let i = 0; i < this.collisionObjects.length; i++) {
-            const box = this.collisionObjects[i];
+        for (let i = 0; i < this.monsterCollisionObjects.length; i++) {
+            const box = this.monsterCollisionObjects[i];
             if (box.isEmpty()) continue; // porta aperta o ostacolo rimosso: non blocca
             if (ray.intersectBox(box, hitPoint)) {
                 const hitDist = from.distanceTo(hitPoint);
@@ -460,6 +513,82 @@ export class PlayerController {
             }
         }
         return true;
+    }
+
+    /**
+     * Apre automaticamente le porte chiuse vicino al mostro. Prima di questa
+     * fix il mostro non aveva NESSUN modo di aprire una porta — restava
+     * bloccato indefinitamente contro qualunque porta chiusa che intralciasse
+     * l'unico percorso verso il giocatore. Riusa lo stesso evento
+     * 'portaAperta' che main.js già gestisce per il tasto E del giocatore
+     * (stessa animazione/suono), quindi non serve duplicare la logica del
+     * cigolio/collisione.
+     *
+     * Regola dei 3 secondi: se il GIOCATORE ha chiuso quella porta (hinge.
+     * userData.closedAt impostato in main.js, solo nel ramo di chiusura —
+     * il mostro stesso non chiude mai le porte), il mostro può riaprirla solo
+     * a partire da 3s dopo — dà al giocatore un attimo di respiro reale dopo
+     * essersela chiusa alle spalle, invece di vederla riaprirsi all'istante.
+     * Porte mai toccate dal giocatore (closedAt assente) si aprono subito.
+     */
+    _tryOpenNearbyDoors(mostroMesh) {
+        if (!this.doors || this.doors.length === 0) return;
+        const REOPEN_COOLDOWN_MS = 3000;
+        const OPEN_RADIUS = 3.0; // abbastanza da raggiungere una porta a cavallo del vano da 2.4m
+
+        for (const hinge of this.doors) {
+            const ud = hinge.userData;
+            if (!ud || ud.isOpen || ud.isAnimating) continue;
+
+            const dx = hinge.position.x - mostroMesh.position.x;
+            const dz = hinge.position.z - mostroMesh.position.z;
+            if (Math.hypot(dx, dz) > OPEN_RADIUS) continue;
+
+            const closedAt = ud.closedAt || 0;
+            if (closedAt !== 0 && (performance.now() - closedAt) < REOPEN_COOLDOWN_MS) continue;
+
+            this._dispatchGlobalEvent('portaAperta', { object: hinge });
+        }
+    }
+
+    /**
+     * Rete di sicurezza: teletrasporta il mostro a distanza ravvicinata (ma
+     * non addosso) al giocatore quando resta bloccato troppo a lungo — vedi
+     * la soglia dei 4s in _updateMostroAI. Prova alcune posizioni casuali
+     * attorno al giocatore verificando che non cadano dentro un muro/porta
+     * chiusa (monsterCollisionObjects), con un fallback non validato se
+     * proprio non trova nulla di libero entro il numero di tentativi.
+     */
+    _teleportMonsterNearPlayer(mostroMesh) {
+        const player = this.camera.position;
+        const radius = 6 + Math.random() * 4; // 6-10 unità: vicino ma non addosso
+        const testSize = new THREE.Vector3(1.5, 2.8, 1.5); // stesso ingombro usato per lo steering
+
+        for (let attempt = 0; attempt < 8; attempt++) {
+            const angle = Math.random() * Math.PI * 2;
+            const candidate = new THREE.Vector3(
+                player.x + Math.cos(angle) * radius,
+                mostroMesh.position.y,
+                player.z + Math.sin(angle) * radius
+            );
+            const box = new THREE.Box3().setFromCenterAndSize(candidate, testSize);
+            let blocked = false;
+            for (const c of this.monsterCollisionObjects) {
+                if (!c.isEmpty() && box.intersectsBox(c)) { blocked = true; break; }
+            }
+            if (!blocked) {
+                mostroMesh.position.copy(candidate);
+                return;
+            }
+        }
+
+        // Fallback: nessuna posizione libera trovata, piazzalo comunque vicino
+        const angle = Math.random() * Math.PI * 2;
+        mostroMesh.position.set(
+            player.x + Math.cos(angle) * radius,
+            mostroMesh.position.y,
+            player.z + Math.sin(angle) * radius
+        );
     }
 
     _updateMostroAI(mostroMesh, deltaTime) {
@@ -596,8 +725,8 @@ export class PlayerController {
             const probeBox = new THREE.Box3().setFromCenterAndSize(probePos, monsterSize);
 
             let ostruito = false;
-            for (let i = 0; i < this.collisionObjects.length; i++) {
-                if (probeBox.intersectsBox(this.collisionObjects[i])) {
+            for (let i = 0; i < this.monsterCollisionObjects.length; i++) {
+                if (probeBox.intersectsBox(this.monsterCollisionObjects[i])) {
                     ostruito = true;
                     break;
                 }
@@ -613,6 +742,12 @@ export class PlayerController {
             }
         }
 
+        // ── Prova ad aprire porte vicine chiuse (vedi _tryOpenNearbyDoors) ────
+        // Fatto qui, prima del controllo "bloccato da troppo tempo", così una
+        // porta che si stava già aprendo ha la possibilità di liberare il
+        // varco prima che scatti il teletrasporto di emergenza qui sotto.
+        this._tryOpenNearbyDoors(mostroMesh);
+
         // ── Fuga da angolo: se bloccato da >STUCK_TIME secondi ───────────────
         const movedDist = mostroMesh.position.distanceTo(ai.lastPos);
         ai.lastPos.copy(mostroMesh.position);
@@ -623,6 +758,22 @@ export class PlayerController {
             ai.stuckTimer = 0;
             ai.escapeDir = null;
             ai.escapeClock = 0;
+        }
+
+        // ── Teletrasporto di emergenza: bloccato da troppo tempo (>4s) ────────
+        // Nonostante il passaggio attraverso l'arredamento e l'apertura delle
+        // porte, il mostro può comunque restare incastrato (es. porta ancora
+        // in animazione, geometria imprevista). Come ultima rete di sicurezza,
+        // dopo 4s fermo si teletrasporta a distanza ravvicinata dal giocatore
+        // per poter riprendere l'inseguimento invece di restare bloccato per
+        // il resto della partita.
+        if (ai.stuckTimer > 4.0) {
+            this._teleportMonsterNearPlayer(mostroMesh);
+            ai.stuckTimer = 0;
+            ai.escapeDir = null;
+            ai.escapeClock = 0;
+            ai.lastPos.copy(mostroMesh.position);
+            return;
         }
 
         if (ai.stuckTimer > 1.5) {
@@ -657,8 +808,8 @@ export class PlayerController {
         futurePosX.x += moveStep.x;
         const boxX = new THREE.Box3().setFromCenterAndSize(futurePosX, monsterSize);
         let collideX = false;
-        for (let i = 0; i < this.collisionObjects.length; i++) {
-            if (boxX.intersectsBox(this.collisionObjects[i])) { collideX = true; break; }
+        for (let i = 0; i < this.monsterCollisionObjects.length; i++) {
+            if (boxX.intersectsBox(this.monsterCollisionObjects[i])) { collideX = true; break; }
         }
         if (!collideX) mostroMesh.position.x = futurePosX.x;
 
@@ -666,8 +817,8 @@ export class PlayerController {
         futurePosZ.z += moveStep.z;
         const boxZ = new THREE.Box3().setFromCenterAndSize(futurePosZ, monsterSize);
         let collideZ = false;
-        for (let i = 0; i < this.collisionObjects.length; i++) {
-            if (boxZ.intersectsBox(this.collisionObjects[i])) { collideZ = true; break; }
+        for (let i = 0; i < this.monsterCollisionObjects.length; i++) {
+            if (boxZ.intersectsBox(this.monsterCollisionObjects[i])) { collideZ = true; break; }
         }
         if (!collideZ) mostroMesh.position.z = futurePosZ.z;
 

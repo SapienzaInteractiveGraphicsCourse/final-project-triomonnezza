@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -428,6 +428,16 @@
             <li><span class="kbd">E</span> Interact</li>
             <li><span class="kbd">ESC</span> Pause</li>
         </ul>
+        <div class="settings" style="margin-top: 20px; text-align: left; background: #111; padding: 10px 20px; border: 2px solid #333; box-shadow: 4px 4px 0 #000; width: 320px;">
+            <div style="margin-bottom: 15px;">
+                <label for="music-volume" style="display: block; font-size: 1.2rem; margin-bottom: 5px;">Music Volume: <span id="music-vol-val">100%</span></label>
+                <input type="range" id="music-volume" min="0" max="100" value="100" style="width: 100%; cursor: pointer;">
+            </div>
+            <div>
+                <label for="sfx-volume" style="display: block; font-size: 1.2rem; margin-bottom: 5px;">SFX Volume: <span id="sfx-vol-val">100%</span></label>
+                <input type="range" id="sfx-volume" min="0" max="100" value="100" style="width: 100%; cursor: pointer;">
+            </div>
+        </div>
         <div class="menu-buttons" style="margin-top: 10px; z-index: 100;">
             <button class="diff-btn restart-btn" style="font-size: 1.2rem; padding: 6px 0;" onclick="location.href='?diff=' + (window.currentDifficulty || 'easy')">RESTART</button>
             <button class="diff-btn mainmenu-btn" style="font-size: 1.2rem; padding: 6px 0;" onclick="location.href='index.html'">MAIN MENU</button>
@@ -608,3 +618,5 @@
     </script>
 </body>
 </html>
+
+

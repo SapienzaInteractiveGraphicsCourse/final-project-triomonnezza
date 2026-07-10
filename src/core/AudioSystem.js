@@ -20,6 +20,9 @@ class AudioSystemClass {
         this.mattressStepLoop = null;
 
         this.isLoaded = false;
+        
+        this.musicVolume = 1.0;
+        this.sfxVolume = 1.0;
     }
 
     /**
@@ -48,6 +51,7 @@ class AudioSystemClass {
             { name: 'door_key', path: 'assets/sounds/sfx/Creepy Events Sounds/door key.wav' },
             { name: 'demon_breathing', path: 'assets/sounds/sfx/Creepy Events Sounds/demon breathing.wav' },
             { name: 'blood_splash', path: 'assets/sounds/sfx/Creepy Events Sounds/blood splash 2.wav' },
+            { name: 'onii_chan', path: "assets/sounds/sfx/Onii-chan,ohayo!_256k.mp3" },
             
             // Soundtracks
             { name: 'bgm_doom', path: 'assets/sounds/Soundtracks/7. Awaiting Doom.wav' },
@@ -157,7 +161,7 @@ class AudioSystemClass {
         const inStartVol = audioIn.getVolume();
         
         const outTargetVol = 0;
-        const inTargetVol = 0.5;
+        const inTargetVol = 0.5 * this.musicVolume;
 
         let currentStep = 0;
         const interval = setInterval(() => {
@@ -183,7 +187,7 @@ class AudioSystemClass {
 
         const sound = new THREE.Audio(this.listener);
         sound.setBuffer(this.buffers[name]);
-        sound.setVolume(volume);
+        sound.setVolume(volume * this.sfxVolume);
         sound.play();
         return sound;
     }
@@ -200,7 +204,7 @@ class AudioSystemClass {
         const sound = new THREE.PositionalAudio(this.listener);
         sound.setBuffer(this.buffers[name]);
         sound.setRefDistance(refDistance);
-        sound.setVolume(volume);
+        sound.setVolume(volume * this.sfxVolume);
         return sound;
     }
 
@@ -243,11 +247,25 @@ class AudioSystemClass {
         if (!this.mattressStepLoop) return;
 
         if (isMoving) {
-            this.mattressStepLoop.setVolume(0.15); // lower volume
+            this.mattressStepLoop.setVolume(0.15 * this.sfxVolume);
             this.mattressStepLoop.setPlaybackRate(isSprinting ? 1.6 : 1.0);
         } else {
             this.mattressStepLoop.setVolume(0);
         }
+    }
+
+    setMusicVolume(vol) {
+        this.musicVolume = vol;
+        if (this.currentBgm === 'doom' && this.bgmDoom) {
+            this.bgmDoom.setVolume(0.5 * this.musicVolume);
+        } else if (this.currentBgm === 'ambience' && this.bgmAmbience) {
+            this.bgmAmbience.setVolume(0.5 * this.musicVolume);
+        }
+    }
+
+    setSfxVolume(vol) {
+        this.sfxVolume = vol;
+        // The mattress step loop updates its volume continuously on movement
     }
 }
 

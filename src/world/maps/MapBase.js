@@ -1,11 +1,21 @@
 import * as THREE from 'three';
 import { InteriorAssetManager } from '../InteriorAssetManager.js';
+import { getPropScale, isStructuralProp } from '../PropScale.js';
 
 export class MapBase {
 
     constructor(scene) {
         this.scene = scene;
         this.collisionBoxes = [];
+        // Subset of collisionBoxes containing only walls + doors (no
+        // decorative/furniture props). The monster uses this list instead of
+        // collisionBoxes so it can phase through furniture — it used to get
+        // stuck weaving around beds/tables/cabinets since its steering AI has
+        // no real pathfinding, just ray-probing.
+        this.monsterCollisionBoxes = [];
+        // Interactive hinge doors (not the goal door), so the monster can
+        // open ones that block its path — see PlayerController._updateMostroAI.
+        this.doors = [];
         this.triggerZones = [];
         this.playerSpawn = new THREE.Vector3(0, 1.8, 0); // Eye level height
         this.playerSpawnRotationY = 0;
@@ -39,6 +49,7 @@ export class MapBase {
 
         const box = new THREE.Box3().setFromObject(mesh);
         this.collisionBoxes.push(box);
+        this.monsterCollisionBoxes.push(box);
         return mesh;
     }
 
@@ -58,7 +69,9 @@ export class MapBase {
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(x, y, z);
         mesh.updateMatrixWorld(true);
-        this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
+        const box = new THREE.Box3().setFromObject(mesh);
+        this.collisionBoxes.push(box);
+        this.monsterCollisionBoxes.push(box);
     }
 
     buildHospitalRoom(cx, cz, cols, rows, doorways = [], options = {}) {
@@ -280,7 +293,9 @@ export class MapBase {
             mesh.receiveShadow = true;
             mesh.updateMatrixWorld(true);
             this.scene.add(mesh);
-            this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
+            const wallBox = new THREE.Box3().setFromObject(mesh);
+            this.collisionBoxes.push(wallBox);
+            this.monsterCollisionBoxes.push(wallBox);
         };
 
 
@@ -360,6 +375,8 @@ export class MapBase {
             
             this.scene.add(hinge);
             this.collisionBoxes.push(box);
+            this.monsterCollisionBoxes.push(box);
+            this.doors.push(hinge);
             return hinge;
         };
 
@@ -477,16 +494,30 @@ export class MapBase {
     }
 
     /**
-     * Spawns a decorative prop with no collision.
-     * Sets default scale to 2.2 to fix tiny furniture.
+     * Spawns a furniture/decor prop, sized via the per-asset PropScale table
+     * (falls back to the old flat 2.2 for anything not catalogued there).
+     * Floor-standing structural furniture (beds, tables, seating, storage,
+     * appliances — see PropScale.isStructuralProp) gets a real collision
+     * box by default so the player can't walk through it; pass `collide`
+     * explicitly to override either way.
+     * NB: this box only goes into collisionBoxes (player), never
+     * monsterCollisionBoxes — the monster phases through furniture on
+     * purpose so it can't get stuck weaving around decorations.
      */
-    spawnProp(filename, position, rotationY = 0, scale = 2.2) {
-        return this.spawnTile(filename, position, rotationY, scale);
+    spawnProp(filename, position, rotationY = 0, scale = null, collide = null) {
+        const resolvedScale = scale ?? getPropScale(filename);
+        const mesh = this.spawnTile(filename, position, rotationY, resolvedScale);
+        const shouldCollide = collide ?? isStructuralProp(filename);
+        if (mesh && shouldCollide) {
+            this.collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
+        }
+        return mesh;
     }
 
     /**
      * Spawns a wall-mounted decoration (painting, mirror, shelf, clock, etc.)
      * correctly positioned flush against a wall face, at a comfortable viewing height.
+     * Sized via the per-asset PropScale table like spawnProp.
      *
      * @param {string}  filename    GLB asset name
      * @param {'N'|'S'|'E'|'W'} wall  Which wall it hangs on
@@ -495,21 +526,32 @@ export class MapBase {
      * @param {number}  wallY       World Y of the wall face (default 0 for floor-level walls)
      * @param {number}  hangY       Height above floor to hang the prop (default 1.8)
      * @param {number}  inset       How far off the wall surface (default 0.28)
+     * @param {number}  scale       Explicit scale override (default: PropScale lookup)
      */
-    spawnWallProp(filename, wall, wallX, wallZ, wallY = 0, hangY = 1.8, inset = 0.28) {
+    spawnWallProp(filename, wall, wallX, wallZ, wallY = 0, hangY = 1.8, inset = 0.28, scale = null) {
         let posX = wallX;
         let posZ = wallZ;
         let rotY = 0;
 
-        // Face the prop inward (toward the room interior)
+        // Face the prop inward (toward the room interior).
+        // Wall-decor assets (paintings, mirrors, clock, wall shelves) are
+        // authored with their flat face in the local Y-Z plane — i.e. their
+        // face normal runs along local X, not -Z like a "forward-facing"
+        // prop (chair, TV). Confirmed by inspecting each GLB's own bounding
+        // box (painting/mirror/clock are all razor-thin along X) and by
+        // visually testing in-game: with a plain -Z-forward rotation table,
+        // every wall-mounted item rendered edge-on (a thin sliver) instead
+        // of flat against the wall. The extra +90° below re-aligns the
+        // local-X face normal with the wall-perpendicular direction.
         switch (wall) {
-            case 'N': posZ += inset; rotY = 0;           break; // North wall → face South
-            case 'S': posZ -= inset; rotY = Math.PI;     break; // South wall → face North
-            case 'W': posX += inset; rotY = Math.PI / 2; break; // West wall  → face East
-            case 'E': posX -= inset; rotY = -Math.PI / 2;break; // East wall  → face West
+            case 'N': posZ += inset; rotY = Math.PI / 2;      break; // North wall → face South
+            case 'S': posZ -= inset; rotY = -Math.PI / 2;     break; // South wall → face North
+            case 'W': posX += inset; rotY = Math.PI;          break; // West wall  → face East
+            case 'E': posX -= inset; rotY = 0;                break; // East wall  → face West
         }
 
-        return this.spawnTile(filename, new THREE.Vector3(posX, hangY, posZ), rotY);
+        const resolvedScale = scale ?? getPropScale(filename);
+        return this.spawnTile(filename, new THREE.Vector3(posX, hangY, posZ), rotY, resolvedScale);
     }
 
     /**
@@ -784,9 +826,13 @@ export class MapBase {
             }
         });
 
-        // Collisione — verrà svuotata all'apertura
+        // Collisione — verrà svuotata all'apertura. Non va in this.doors:
+        // la porta del goal richiede la chiave ed è tutta logica del
+        // giocatore — il mostro resta semplicemente bloccato da essa
+        // (aggiunta a monsterCollisionBoxes) invece di poterla aprire.
         const box = new THREE.Box3().setFromObject(group);
         this.collisionBoxes.push(box);
+        this.monsterCollisionBoxes.push(box);
         this._goalDoorBox   = box;
         this._goalDoorGroup = group;
 
@@ -879,6 +925,8 @@ export class MapBase {
     }
 
     getCollisionBoxes() { return this.collisionBoxes; }
+    getMonsterCollisionBoxes() { return this.monsterCollisionBoxes; }
+    getDoors()          { return this.doors; }
     getTriggerZones()   { return this.triggerZones; }
     getPlayerSpawn()    { return this.playerSpawn; }
     getPlayerRotationY(){ return this.playerSpawnRotationY; }

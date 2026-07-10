@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { MapBase } from './MapBase.js';
 
 /**
@@ -55,8 +55,11 @@ export class MapHard extends MapBase {
         // so that _goalDoorPositions is populated before hinged doors are spawned.
         this.spawnGoalDoor(-2 + 0.15, 4, Math.PI / 2);
 
-        const build = (tx, tz, cols, rows, doors) =>
+        const build = (tx, tz, cols, rows, doors, flickers = false, lampColor = 0xff8844) => {
             this.buildRoomByTiles(tx, tz, cols, rows, doors, BK);
+            const cx = tx * 4 + cols * 2 - 2;
+            const cz = tz * 4 + rows * 2 - 2;
+        };
 
         // Rooms
         build(0, 0, 3, 3, ['E_1', 'S_1', 'N_0', 'W_1']); // A (start)
@@ -98,425 +101,406 @@ export class MapHard extends MapBase {
         build(26, 8, 1, 8, ['N_0', 'S_0']);               // H24 M→N
         build(18, 17, 6, 1, ['W_0', 'E_0']);              // H25 H→N
 
+
         // Dungeon lamp colour: dim orange torchlight
         const TORCH = 0xff8844;
         const TORCH_DIM = 0xee6633;
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM A — GUARD POST (entrance)
-        // Mood: checkpoint room. Overturned chair, crates stacked by wall.
-        // Single torch lamp. Weapon cabinet on east wall.
+        // ===========================================================
+        // ROOM A - GUARD POST (entrance)
+        // Mood: checkpoint. Crates against east wall, overturned chair.
         // bounds x[-2,10]  z[-2,10]
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(4, 4, 5.5, 0.7, 10, TORCH, true);
+        // Doors: E_1 (east row 1 -> z~4), S_1 (south col 1 -> x~4),
+        //        N_0 (north col 0 -> x~2), W_1 (west row 1 -> z~4)
+        // Goal door: west wall x=-2 at z~4 -- keep west wall z[2,6] floor clear!
+        // ===========================================================
 
-        // Overturned guard table in centre
-        this.spawnProp('tableSmall.glb',    new THREE.Vector3( 6, 0,  4),  Math.PI / 8);
-        this.spawnProp('chair3.glb',        new THREE.Vector3( 4, 0,  6),  Math.PI * 0.7); // toppled
-        // Crates stacked in NE corner
-        this.spawnProp('box.glb',           new THREE.Vector3( 8, 0,  0));
-        this.spawnProp('box2.glb',          new THREE.Vector3( 8, 0,  3),  Math.PI / 5);
-        // Bucket and broom (guards had to clean)
-        this.spawnProp('bucket.glb',        new THREE.Vector3( 0, 0,  8));
-        this.spawnProp('trashBin.glb',      new THREE.Vector3( 2, 0,  8));
-        // Breaker / fusebox on north wall
-        this.spawnWallProp('breakerBox.glb','N',  4, -2, 0, 1.4, 0.2);
-        this.spawnProp('trashBag.glb',      new THREE.Vector3( 4, 0,  8));
-        this.spawnProp('box.glb',           new THREE.Vector3( 8, 0,  6));
+        // Shelves against south wall (z=10). S_1 door at x~4 (gap x[2,6]) -- place at x=8 (east corner)
+        this.spawnProp('shelves.glb',       new THREE.Vector3( 8.5, 0,  8.5));
+        // Crate stack against east wall (x=10). E_1 door at z~4 (gap z[2,6]) -- place at z=8 (south corner)
+        this.spawnProp('box.glb',           new THREE.Vector3( 8.5, 0,  8.5));
+        this.spawnProp('box2.glb',          new THREE.Vector3( 7,   0,  9));
+        // Chair knocked over near south wall clear of S_1 door
+        this.spawnProp('chair3.glb',        new THREE.Vector3( 8,   0,  7),   Math.PI / 3);
+        // Trash bin in NE corner (x=8.5, z=0.5) -- N_0 door at x~2, NE corner x=8.5 is safe
+        this.spawnProp('trashBin.glb',      new THREE.Vector3( 8.5, 0, -0.5));
+        // Breaker box on east wall -- E_1 door at z~4, place at z=0 (north of door)
+        this.spawnWallProp('breakerBox.glb','E', 10, -0.5, 0, 1.5, 0.2);
+        // Painting on south wall, east of S_1 door opening
+        this.spawnWallProp('painting2.glb', 'S',  8, 10, 0, 2.2);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM B — ARMOURY / BARRACKS
-        // Mood: military. Long table for briefings. Cabinets for weapons/supplies.
-        // Two lamps for large room.
-        // cx=34, cz=6  bounds x[26,42]  z[-2,14]
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(30, 3,  5.5, 0.6, 12, TORCH, true);
-        this.spawnCeilingLamp(38, 10, 5.5, 0.6, 12, TORCH);
+        // ===========================================================
+        // ROOM B - ARMOURY / BARRACKS
+        // Mood: fortified storage. Shelves against north wall, crates east.
+        // bounds x[26,42]  z[-2,14]
+        // Doors: W_1 (west row 1 -> z~4), S_2 (south col 2 -> x~34),
+        //        E_2 (east row 2 -> z~6), N_1 (north col 1 -> x~34)
+        // ===========================================================
 
-        // Long briefing table in centre with guards seated around it
-        this.spawnProp('table2.glb',        new THREE.Vector3(34, 0,  6));
-        this.spawnProp('chair2.glb',        new THREE.Vector3(30, 0,  4),  Math.PI / 2);
-        this.spawnProp('chair2.glb',        new THREE.Vector3(30, 0,  8),  Math.PI / 2);
-        this.spawnProp('chair2.glb',        new THREE.Vector3(38, 0,  4), -Math.PI / 2);
-        this.spawnProp('chair2.glb',        new THREE.Vector3(38, 0,  8), -Math.PI / 2);
-        // Supply cabinets against north wall
-        this.spawnProp('cabinetHigh.glb',   new THREE.Vector3(28, 0,  0));
-        this.spawnProp('cabinetHigh.glb',   new THREE.Vector3(32, 0,  0));
-        this.spawnProp('cabinet.glb',       new THREE.Vector3(36, 0,  0));
-        // Stacked crates in south corner
+        // Shelves against west wall (x=26). W_1 door at z~4 (gap z[2,6])
+        // -- shelves at z=0 (north of door) and z=10 (south of door)
+        this.spawnProp('shelves.glb',       new THREE.Vector3(27, 0, -0.5));
+        this.spawnProp('shelves.glb',       new THREE.Vector3(27, 0, 10.5));
+        // Cabinets against north wall (z=-2). N_1 at x~34 (gap x[32,36]) -- place at x=28 and x=40
+        this.spawnProp('cabinet.glb',       new THREE.Vector3(28.5, 0, -0.5));
+        this.spawnProp('cabinet.glb',       new THREE.Vector3(40,   0, -0.5));
+        // Bookshelf against east wall (x=42). E_2 door at z~6 (gap z[4,8]) -- place at z=1 and z=12
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(41, 0,  1), -Math.PI / 2);
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(41, 0, 12), -Math.PI / 2);
+        // Crates in SE corner (x=40, z=12). S_2 door at x~34 -- x=40 is safe
         this.spawnProp('box.glb',           new THREE.Vector3(40, 0, 12));
-        this.spawnProp('box2.glb',          new THREE.Vector3(40, 0,  8),  Math.PI / 6);
-        this.spawnProp('box.glb',           new THREE.Vector3(37, 0, 12));
-        this.spawnProp('trashBin.glb',      new THREE.Vector3(40, 0,  4));
-        this.spawnProp('carpet.glb',        new THREE.Vector3(34, 0.01, 6)); // Briefing rug
-        // Book stacks / logbooks on table
-        this.spawnProp('bookStack2.glb',    new THREE.Vector3(34, 0,  5));
-        this.spawnProp('phone.glb',         new THREE.Vector3(34, 0,  7));
-        // Wall decorations
-        this.spawnWallProp('painting.glb',  'N', 34,  -2, 0, 2.2);
-        this.spawnWallProp('clock.glb',     'E', 42,   6, 0, 2.4);
+        this.spawnProp('box2.glb',          new THREE.Vector3(38, 0, 12.5), Math.PI / 5);
+        // Ladder against south wall (z=14). S_2 door at x~34 (gap x[32,36]) -- place at x=28
+        this.spawnProp('ladder.glb',        new THREE.Vector3(28, 0, 12.5));
+        // Trash bin and bag against south wall, east corner
+        this.spawnProp('trashBin.glb',      new THREE.Vector3(40.5, 0, 12.5));
+        this.spawnProp('trashBag.glb',      new THREE.Vector3(27,   0,  7));
+        // Wall deco
+        this.spawnWallProp('painting3.glb', 'N', 30, -2, 0, 2.2);
+        this.spawnWallProp('clock.glb',     'E', 42,  10, 0, 2.4);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM C — SERVANT QUARTERS / SLEEPING CELLS
-        // Mood: sparse, sad. Two beds, personal items, cracked mirror.
-        // cx=4, cz=38  bounds x[-2,10]  z[30,46]  (tx=0,tz=8, 3×4 → cx=0*4+3*2-2=4, cz=8*4+4*2-2=38)
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(4, 34, 5.5, 0.5, 10, TORCH_DIM, true);
-        this.spawnCeilingLamp(4, 42, 5.5, 0.5, 10, TORCH_DIM);
+        // ===========================================================
+        // ROOM C - SERVANT QUARTERS / SLEEPING CELLS
+        // Mood: cramped sleeping area. Beds along north and south walls.
+        // bounds x[-2,10]  z[30,46]
+        // Doors: N_1 (north col 1 -> x~4), E_1 (east row 1 -> z~36),
+        //        E_3 (east row 3 -> z~44), S_0 (south col 0 -> x~2)
+        // ===========================================================
 
-        // Two simple beds against west wall
-        this.spawnProp('bed2.glb',          new THREE.Vector3( 0, 0, 32), -Math.PI / 2);
-        this.spawnProp('bed2.glb',          new THREE.Vector3( 0, 0, 40), -Math.PI / 2);
-        
-        // Personal items: lamp and bucket by each bed
-        this.spawnProp('tableLamp.glb',     new THREE.Vector3( 2, 0, 32));
-        this.spawnProp('tableLamp.glb',     new THREE.Vector3( 2, 0, 40));
-        
-        // Basic sanitary facilities along the east wall
-        this.spawnProp('bathroomSink.glb',  new THREE.Vector3( 8, 0, 42), -Math.PI/2);
-        this.spawnProp('toilet.glb',        new THREE.Vector3( 8, 0, 34), -Math.PI/2);
-        
-        // Shelves on east wall with minimal possessions
-        this.spawnProp('shelves.glb',       new THREE.Vector3( 9, 0, 38), -Math.PI / 2);
-        this.spawnProp('bookStack.glb',     new THREE.Vector3( 9, 0, 44));
-        
-        // Bucket for washing
-        this.spawnProp('bucket.glb',        new THREE.Vector3( 2, 0, 44));
-        
-        // Cracked mirror on west wall
-        this.spawnWallProp('mirror.glb',    'W', -2, 36, 0, 1.8);
-        this.spawnWallProp('wallShelf.glb', 'E', 10, 32, 0, 1.7);
-        this.spawnProp('carpet2.glb',       new THREE.Vector3( 4, 0.01, 36));
-        this.spawnProp('trashBag.glb',      new THREE.Vector3( 8, 0, 44));
+        // Beds along north wall (z=30). N_1 door at x~4 (gap x[2,6]) -- beds at x=8 (east) and x=0 (west)
+        this.spawnProp('bed2.glb',          new THREE.Vector3( 8,   0, 31),  Math.PI);
+        this.spawnProp('bed.glb',           new THREE.Vector3(-0.5, 0, 31),  Math.PI);
+        // Beds along south wall (z=46). S_0 door at x~2 (gap x[0,4]) -- bed at x=8 only
+        this.spawnProp('bed2.glb',          new THREE.Vector3( 8,   0, 44.5), 0);
+        // Small table beside each bed
+        this.spawnProp('tableSmall3.glb',   new THREE.Vector3( 8,   0, 33.5));
+        this.spawnProp('tableLamp.glb',     new THREE.Vector3( 8,   0.85, 33.5));
+        // Cabinet against east wall (x=10). E_1 at z~36, E_3 at z~44 -- place at z=32 (between) 
+        this.spawnProp('cabinet.glb',       new THREE.Vector3( 9,   0, 32));
+        // Plant in NW corner (x=-0.5, z=30) -- N_1 door at x~4, corner x=0 is safe
+        this.spawnProp('plant.glb',         new THREE.Vector3(-0.5, 0, 30.5));
+        // Broom against west wall (x=-2), mid room -- clear of N and S doors
+        this.spawnProp('broom.glb',         new THREE.Vector3(-0.5, 0, 39));
+        // Bucket against west wall
+        this.spawnProp('bucket.glb',        new THREE.Vector3(-0.5, 0, 41));
+        // Wall deco
+        this.spawnWallProp('painting.glb',  'W', -2, 38, 0, 2.0);
+        this.spawnWallProp('mirror.glb',    'E', 10, 40, 0, 1.9);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM D — INTERROGATION CHAMBER
-        // Mood: sinister. Single chair in centre under a lamp. Cabinets on walls.
-        // cx=36, cz=46  bounds x[26,46]  z[30,62]
-        // (tx=7,tz=8, 3×5 → cx=7*4+3*2-2=36, cz=8*4+5*2-2=46)
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(32, 36, 5.5, 0.5, 9, TORCH_DIM, true);
-        this.spawnCeilingLamp(36, 48, 5.5, 0.5, 9, TORCH_DIM);
+        // ===========================================================
+        // ROOM D - INTERROGATION CHAMBER
+        // Mood: dark and oppressive. Desk and chair against east wall.
+        // Sink and cabinet along south wall.
+        // bounds x[26,38]  z[28,50]  (from build(7,8,3,5))
+        // Doors: N_2 (north col 2 -> x~34), W_1 (west row 1 -> z~34),
+        //        E_4 (east row 4 -> z~46), W_3 (west row 3 -> z~42)
+        // ===========================================================
 
-        // Interrogation chair isolated in the centre under the light
-        this.spawnProp('chair.glb',         new THREE.Vector3(32, 0, 38),  Math.PI);
-        // A bucket next to it... for the mess
-        this.spawnProp('bucket.glb',        new THREE.Vector3(34, 0, 38));
-        this.spawnProp('trashBag.glb',      new THREE.Vector3(34, 0, 36)); 
-        
-        // Table with notes/tools to the side
-        this.spawnProp('tableSmall2.glb',   new THREE.Vector3(36, 0, 36));
-        this.spawnProp('bookStack.glb',     new THREE.Vector3(36, 0, 35));
-        
-        // Cabinets along east wall
-        this.spawnProp('cabinet.glb',       new THREE.Vector3(44, 0, 32));
-        this.spawnProp('cabinetLow.glb',    new THREE.Vector3(44, 0, 40));
-        
-        // Sink against the wall to wash the blood
-        this.spawnProp('bathroomSink.glb',  new THREE.Vector3(44, 0, 46), -Math.PI/2);
-        
-        // Ladder and broom in south corner (for cleaning up?)
-        this.spawnProp('ladder.glb',        new THREE.Vector3(44, 0, 58));
-        this.spawnProp('broom.glb',         new THREE.Vector3(28, 0, 58));
-        this.spawnProp('box.glb',           new THREE.Vector3(42, 0, 46));
-        this.spawnProp('box2.glb',          new THREE.Vector3(40, 0, 48), Math.PI/3);
-        // Wall painting (intimidating portrait)
-        this.spawnWallProp('painting2.glb', 'N', 34, 30, 0, 2.2);
+        // Desk against east wall (x=38). N_2 door at x~34 on north wall -- desk on east is clear
+        // E_4 door at z~46 (gap z[44,48]) -- desk at z=30 is clear (north section)
+        this.spawnProp('table2.glb',        new THREE.Vector3(36.5, 0, 31));
+        this.spawnProp('chair2.glb',        new THREE.Vector3(34.5, 0, 31),  Math.PI / 2);
+        this.spawnProp('tableLamp.glb',     new THREE.Vector3(36.5, 1.16, 30));
+        // Interrogation chair in centre of room (moveable furniture, not against wall)
+        // Place it south section away from all doors -- x=32, z=40 is centre and clear
+        // Interrogation chair removed
+        // Cabinet against south wall (z=50). W_3 door at z~42 on west wall -- south wall clear
+        this.spawnProp('cabinetLow.glb',    new THREE.Vector3(36, 0, 48.5));
+        // Sink against south wall
+        this.spawnProp('bathroomSink.glb',  new THREE.Vector3(29, 0, 48.5), -Math.PI / 2);
+        // Ladder against west wall (x=26). W_1 at z~34, W_3 at z~42 -- place at z=48 (south corner)
+        this.spawnProp('ladder.glb',        new THREE.Vector3(27, 0, 48));
+        // Broom against west wall, north corner (z=29) -- W_1 at z~34, broom at z=29 is safe
+        this.spawnProp('broom.glb',         new THREE.Vector3(27, 0, 29));
+        // Box and trash in corners
+        this.spawnProp('box.glb',           new THREE.Vector3(36.5, 0, 49));
+        this.spawnProp('trashBin.glb',      new THREE.Vector3(27,   0, 38));
+        // Wall deco
+        this.spawnWallProp('painting2.glb', 'N', 29, 28, 0, 2.2);
+        this.spawnWallProp('breakerBox.glb','E', 38, 38, 0, 1.4, 0.2);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM E — COUNCIL HALL / COMMAND ROOM
-        // Mood: grand but decayed. Long council table. Multiple chairs.
-        // Bookcases, a globe, paintings on walls. Large room → 3 lamps.
-        // cx=64, cz=10  bounds x[54,74]  z[2,18]
-        // (tx=14,tz=1, 5×4 → cx=14*4+5*2-2=64, cz=1*4+4*2-2=10)
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(58, 6,  5.5, 0.7, 12, TORCH);
-        this.spawnCeilingLamp(64, 10, 5.5, 0.7, 12, TORCH, true);
-        this.spawnCeilingLamp(70, 14, 5.5, 0.7, 12, TORCH);
+        // ===========================================================
+        // ROOM E - COUNCIL HALL / COMMAND ROOM
+        // Mood: grand. Long table pushed north, chairs around it. Bookcases on west.
+        // bounds x[54,74]  z[2,18]
+        // Doors: W_1 (west row 1 -> z~6), S_1 (south col 1 -> x~58),
+        //        S_4 (south col 4 -> x~70), E_2 (east row 2 -> z~10)
+        // ===========================================================
 
-        // Long council table with chairs all around it
-        this.spawnProp('table.glb',         new THREE.Vector3(62, 0, 10));
-        this.spawnProp('table.glb',         new THREE.Vector3(68, 0, 10));
-        this.spawnProp('chair.glb',         new THREE.Vector3(58, 0, 10),  Math.PI / 2);
-        this.spawnProp('chair.glb',         new THREE.Vector3(62, 0,  6),  Math.PI);
-        this.spawnProp('chair.glb',         new THREE.Vector3(66, 0,  6),  Math.PI);
-        this.spawnProp('chair.glb',         new THREE.Vector3(70, 0,  6),  Math.PI);
-        this.spawnProp('chair.glb',         new THREE.Vector3(62, 0, 14));
-        this.spawnProp('chair.glb',         new THREE.Vector3(66, 0, 14));
-        this.spawnProp('chair.glb',         new THREE.Vector3(72, 0, 10), -Math.PI / 2);
-        // Bookcases on north and east walls
-        this.spawnProp('bookshelf.glb',     new THREE.Vector3(55, 0,  8), -Math.PI / 2);
-        this.spawnProp('bookshelf.glb',     new THREE.Vector3(55, 0, 14), -Math.PI / 2);
-        this.spawnProp('sideboard.glb',     new THREE.Vector3(72, 0,  4));
+        // Long council table along north wall (z=2). N wall has no doors.
+        // S_1 at x~58, S_4 at x~70. W_1 at z~6. E_2 at z~10.
+        // Table centred x=64,z=5 -- chairs on west side (x=57) and east side (x=72) clear of doors
+        this.spawnProp('table.glb',         new THREE.Vector3(61, 0, 3.5));
+        this.spawnProp('table.glb',         new THREE.Vector3(67, 0, 3.5));
+        // Chairs around table -- south side of table (z=7) avoids W_1 (z~6 gap) slightly
+        // N side of table at z=3 is fine, S side at z=7 is fine (door gap is z[4,8] but chairs are on south side of table which is at z=5+width~1=z=6, touch the gap edge; push table north)
+        // Chair removed  // north of table
+        // Chair removed
+        this.spawnProp('chair.glb',         new THREE.Vector3(57, 0, 3.5), Math.PI / 2); // west head
+        this.spawnProp('chair.glb',         new THREE.Vector3(72, 0, 3.5), -Math.PI / 2); // east head
+        // Bookcases against west wall (x=54). W_1 at z~6 (gap z[4,8]) -- place at z=2 and z=13
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(55, 0,  2), Math.PI / 2);
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(55, 0, 13), Math.PI / 2);
+        // Sideboard against east wall (x=74). E_2 at z~10 (gap z[8,12]) -- place at z=4 and z=16
+        this.spawnProp('sideboard.glb',     new THREE.Vector3(72.5, 0,  4));
+        this.spawnProp('sideboard.glb',     new THREE.Vector3(72.5, 0, 15));
         // Books and radio on sideboard
-        this.spawnProp('bookStack2.glb',    new THREE.Vector3(72, 0,  3));
-        this.spawnProp('radio.glb',         new THREE.Vector3(72, 0,  4));
-        // Globe in corner (council room must-have)
-        this.spawnProp('plant.glb',         new THREE.Vector3(72, 0, 16));
-        this.spawnProp('carpet.glb',        new THREE.Vector3(64, 0.01, 10)); // Grand rug
-        this.spawnProp('trashBin.glb',      new THREE.Vector3(56, 0, 16));
-        // Wall deco: grand painting behind the head of the table
+        this.spawnProp('bookStack2.glb',    new THREE.Vector3(72.5, 1.31,  3.5));
+        this.spawnProp('radio.glb',         new THREE.Vector3(72.5, 1.31,  4.5));
+        // Carpet under table
+        this.spawnProp('carpet.glb',        new THREE.Vector3(64, 0.01, 5));
+        // Plant in SW corner (x=55, z=16) -- W_1 at z~6, plant at z=16 is safe
+        this.spawnProp('plant.glb',         new THREE.Vector3(55, 0, 16));
+        // Trash bin in NW corner
+        this.spawnProp('trashBin.glb',      new THREE.Vector3(55, 0,  2.5));
+        // Wall deco
         this.spawnWallProp('painting3.glb', 'N', 64,  2, 0, 2.4);
-        this.spawnWallProp('painting4.glb', 'E', 74, 10, 0, 2.0);
-        this.spawnWallProp('clock.glb',     'W', 54,  8, 0, 2.4);
+        this.spawnWallProp('clock.glb',     'W', 54,  2, 0, 2.4);
+        this.spawnWallProp('painting4.glb', 'E', 74, 15, 0, 2.0);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM F — ARCHIVES / SCRIPTORIUM
-        // Mood: scholarly disorder. Writing desks, bookshelves, scattered papers.
-        // cx=68, cz=50  bounds x[58,78]  z[42,58]
-        // (tx=15,tz=11, 5×4 → cx=15*4+5*2-2=68, cz=11*4+4*2-2=50)
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(62, 46, 5.5, 0.6, 11, TORCH_DIM);
-        this.spawnCeilingLamp(74, 54, 5.5, 0.6, 11, TORCH_DIM, true);
+        // ===========================================================
+        // ROOM F - ARCHIVES / SCRIPTORIUM
+        // Mood: scholarly disorder. Writing desks against north wall,
+        // bookshelves against east and south walls.
+        // bounds x[58,78]  z[42,58]
+        // Doors: N_3 (north col 3 -> x~70), N_0 (north col 0 -> x~60),
+        //        W_1 (west row 1 -> z~46), S_0 (south col 0 -> x~60), S_2 (south col 2 -> x~68)
+        // ===========================================================
 
-        // Writing desks with chairs, arranged for scribes
-        this.spawnProp('table2.glb',        new THREE.Vector3(62, 0, 46));
-        this.spawnProp('chair2.glb',        new THREE.Vector3(62, 0, 48),  Math.PI);
-        this.spawnProp('table2.glb',        new THREE.Vector3(70, 0, 54));
-        this.spawnProp('chair2.glb',        new THREE.Vector3(70, 0, 52));
-        // Book stacks everywhere
-        this.spawnProp('bookStack.glb',     new THREE.Vector3(62, 0, 44));
-        this.spawnProp('bookStack2.glb',    new THREE.Vector3(70, 0, 56));
-        this.spawnProp('bookStack.glb',     new THREE.Vector3(75, 0, 44));
-        // Bookshelves lining east and south walls
-        this.spawnProp('bookshelf.glb',     new THREE.Vector3(77, 0, 46), -Math.PI / 2);
-        this.spawnProp('bookshelf.glb',     new THREE.Vector3(77, 0, 54), -Math.PI / 2);
-        this.spawnProp('shelves.glb',       new THREE.Vector3(62, 0, 57), -Math.PI / 2);
-        // Trash on floor
-        this.spawnProp('trashBin.glb',      new THREE.Vector3(75, 0, 56));
-        this.spawnProp('trashBag.glb',      new THREE.Vector3(60, 0, 52));
-        this.spawnProp('box.glb',           new THREE.Vector3(76, 0, 42));
-        // Wall decorations
-        this.spawnWallProp('painting4.glb', 'N', 68, 42, 0, 2.2);
+        // Writing desks against east wall (x=78). S_2 at x~68, N_3 at x~70. East wall clear.
+        // E_2 is not a door in this room. Place desks at z=44 and z=54
+        this.spawnProp('table2.glb',        new THREE.Vector3(76.5, 0, 44));
+        this.spawnProp('chair2.glb',        new THREE.Vector3(74.5, 0, 44),  Math.PI / 2);
+        this.spawnProp('tableLamp.glb',     new THREE.Vector3(76.5, 1.16, 43.5));
+        this.spawnProp('table2.glb',        new THREE.Vector3(76.5, 0, 54));
+        this.spawnProp('chair2.glb',        new THREE.Vector3(74.5, 0, 54),  Math.PI / 2);
+        // Bookshelves against south wall (z=58). S_0 at x~60 (gap x[58,62]), S_2 at x~68 (gap x[66,70])
+        // Place at x=64 (between doors) and x=75 (east of S_2 gap)
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(64, 0, 57), -Math.PI / 2);
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(75, 0, 57), -Math.PI / 2);
+        // Shelves against west wall (x=58). W_1 at z~46 (gap z[44,48]) -- place at z=43 and z=54
+        this.spawnProp('shelves.glb',       new THREE.Vector3(59.5, 0, 43));
+        this.spawnProp('shelves.glb',       new THREE.Vector3(59.5, 0, 54));
+        // Book stacks on floor and desks
+        this.spawnProp('bookStack.glb',     new THREE.Vector3(76.5, 0, 46));
+        this.spawnProp('bookStack2.glb',    new THREE.Vector3(64,   0, 50));
+        this.spawnProp('bookStack.glb',     new THREE.Vector3(59.5, 0, 50));
+        // Trash bins
+        this.spawnProp('trashBin.glb',      new THREE.Vector3(76.5, 0, 56));
+        this.spawnProp('trashBag.glb',      new THREE.Vector3(64,   0, 57.5));
+        // Wall deco
+        this.spawnWallProp('painting4.glb', 'N', 65, 42, 0, 2.2);
         this.spawnWallProp('clock.glb',     'E', 78, 50, 0, 2.4);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM G — UNDERCROFT / STORAGE VAULT
-        // Mood: underground storage. Crates, barrels (boxes), old equipment.
-        // Large room → 2 lamps, both dim.
-        // cx=8, cz=74  bounds x[-8,24]  z[66,78]
-        // (tx=-2,tz=17, 5×3 → cx=-2*4+5*2-2=0, cz=17*4+3*2-2=74)
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(-2, 70, 5.5, 0.5, 11, TORCH_DIM, true);
-        this.spawnCeilingLamp(12, 76, 5.5, 0.5, 11, TORCH_DIM);
+        // ===========================================================
+        // ROOM G - UNDERCROFT / STORAGE VAULT
+        // Mood: underground storage. All crates against walls, ladder in corner.
+        // bounds x[-8,24]  z[66,78]
+        // Doors: N_2 (north col 2 -> x~4), E_1 (east row 1 -> z~70), S_3 (south col 3 -> x~8)
+        // ===========================================================
 
-        // Crates and boxes stacked in corners
-        this.spawnProp('box.glb',           new THREE.Vector3(-5, 0, 68));
-        this.spawnProp('box2.glb',          new THREE.Vector3(-2, 0, 68),  Math.PI / 4);
-        this.spawnProp('box.glb',           new THREE.Vector3( 2, 0, 70),  Math.PI / 7);
-        this.spawnProp('box.glb',           new THREE.Vector3(18, 0, 68));
-        this.spawnProp('box2.glb',          new THREE.Vector3(18, 0, 76),  Math.PI / 5);
-        // Tools and equipment
-        this.spawnProp('ladder.glb',        new THREE.Vector3(20, 0, 76));
-        this.spawnProp('bucket.glb',        new THREE.Vector3(14, 0, 76));
-        this.spawnProp('broom.glb',         new THREE.Vector3(-5, 0, 76));
-        this.spawnProp('trashBag.glb',      new THREE.Vector3( 6, 0, 76));
-        // Breaker box on south wall (utility room)
-        this.spawnWallProp('breakerBox.glb','S',  6, 78, 0, 1.5, 0.2);
+        // Crates against west wall (x=-8). No doors on west wall -- full row
+        this.spawnProp('box.glb',           new THREE.Vector3(-6.5, 0, 68));
+        this.spawnProp('box2.glb',          new THREE.Vector3(-6.5, 0, 72),  Math.PI / 5);
+        this.spawnProp('box.glb',           new THREE.Vector3(-6.5, 0, 76));
+        // Crates against north wall (z=66). N_2 at x~4 (gap x[2,6]) -- place at x=-4 and x=14
+        this.spawnProp('box.glb',           new THREE.Vector3(-4,   0, 67));
+        this.spawnProp('box2.glb',          new THREE.Vector3(14,   0, 67));
+        this.spawnProp('box.glb',           new THREE.Vector3(18,   0, 67));
+        // Crates against south wall (z=78). S_3 at x~8 (gap x[6,10]) -- place at x=-4 and x=16
+        this.spawnProp('box.glb',           new THREE.Vector3(-4,   0, 77));
+        this.spawnProp('box2.glb',          new THREE.Vector3(16,   0, 77),  Math.PI / 4);
+        // Ladder against east wall (x=24). E_1 at z~70 (gap z[68,72]) -- ladder at z=74
+        this.spawnProp('ladder.glb',        new THREE.Vector3(22.5, 0, 74));
+        // Bucket and broom in NW corner
+        this.spawnProp('bucket.glb',        new THREE.Vector3(-6.5, 0, 66.5));
+        this.spawnProp('broom.glb',         new THREE.Vector3(-5,   0, 66.5));
+        // Trash bag against south wall
+        this.spawnProp('trashBag.glb',      new THREE.Vector3(-4,   0, 77.5));
+        // Breaker boxes on south wall
+        this.spawnWallProp('breakerBox.glb','S',  2, 78, 0, 1.5, 0.2);
         this.spawnWallProp('breakerBox.glb','S', 14, 78, 0, 1.5, 0.2);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM H — THE CROSSROADS HUB
-        // Mood: central passage point. Minimal furniture, just a resting bench
-        // and a painting on the wall. Multiple exits.
-        // cx=64, cz=74  bounds x[58,74]  z[66,78]
-        // (tx=15,tz=17, 3×3 → cx=15*4+3*2-2=64, cz=17*4+3*2-2=74)
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(64, 72, 5.5, 0.6, 11, TORCH, true);
+        // ===========================================================
+        // ROOM H - THE CROSSROADS HUB
+        // Mood: junction point. Minimal furniture, resting spot against north wall.
+        // bounds x[58,74]  z[66,78]
+        // Doors: W_1 (west row 1 -> z~70), N_0 (north col 0 -> x~60),
+        //        N_2 (north col 2 -> x~68), S_0 (south col 0 -> x~60), E_0 (east row 0 -> z~68)
+        // ===========================================================
 
-        // Simple resting bench (small table + chair for guards passing through)
-        this.spawnProp('tableSmall2.glb',   new THREE.Vector3(62, 0, 74));
-        this.spawnProp('chair3.glb',        new THREE.Vector3(62, 0, 70),  Math.PI);
-        // Plant in corner
-        this.spawnProp('plant2.glb',        new THREE.Vector3(72, 0, 76));
-        // Painting on north wall
-        this.spawnWallProp('painting.glb',  'N', 66, 66, 0, 2.2);
+        // Small table against east wall (x=74). E_0 at z~68 (gap z[66,70]) -- table at z=74
+        this.spawnProp('tableSmall2.glb',   new THREE.Vector3(72.5, 0, 74));
+        this.spawnProp('chair3.glb',        new THREE.Vector3(70.5, 0, 74),  Math.PI / 2);
+        // Plant in SE corner (x=73, z=77) -- S_0 at x~60, E_0 at z~68; SE corner clear
+        this.spawnProp('plant2.glb',        new THREE.Vector3(73,   0, 77));
+        // Painting on east wall, south of E_0 door -- E_0 at z~68, painting at z=74 is safe
+        this.spawnWallProp('painting.glb',  'E', 74, 74, 0, 2.2);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM I — MONSTER LAIR (former throne room)
-        // Mood: deeply unsettling. Evidence of long habitation — a torn mattress,
-        // scattered food debris, broken furniture. The monster lives here.
-        // cx=6, cz=102  bounds x[-2,14]  z[94,110]
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp( 6, 98,  5.5, 0.5, 9, 0xff4400, true);  // red-orange flicker
-        this.spawnCeilingLamp( 6, 106, 5.5, 0.4, 7, 0xff3300, true);  // dying
+        // ===========================================================
+        // ROOM I - MONSTER LAIR (former throne room)
+        // Mood: deeply unsettling. Torn mattress in corner, refuse everywhere.
+        // bounds x[-2,14]  z[94,110]
+        // Doors: N_1 (north col 1 -> x~4), E_2 (east row 2 -> z~102)
+        // ===========================================================
 
-        // Torn mattress/bed in corner — the monster's sleeping spot
-        this.spawnProp('bed2.glb',          new THREE.Vector3( 1, 0, 96));
-        // Scattered refuse around the room
-        this.spawnProp('trashBag.glb',      new THREE.Vector3( 0, 0, 108));
-        this.spawnProp('trashBag.glb',      new THREE.Vector3( 6, 0, 108),  Math.PI / 3);
-        this.spawnProp('trashBag.glb',      new THREE.Vector3(12, 0, 104),  Math.PI / 5);
-        // Boxes overturned
-        this.spawnProp('box.glb',           new THREE.Vector3(12, 0, 96),   Math.PI / 4);
-        this.spawnProp('box2.glb',          new THREE.Vector3(12, 0, 100),  Math.PI / 3);
-        // Single lamp (knocked over)
-        this.spawnProp('tableLamp.glb',     new THREE.Vector3( 2, 0, 98),   Math.PI / 6);
-        // Cracked mirror on west wall — eerie reflection
+        // Torn mattress against west wall (x=-2). N_1 at x~4 -- west wall clear
+        this.spawnProp('bed2.glb',          new THREE.Vector3(-0.5, 0, 96));
+        // Refuse scattered but always against walls, not in doorway areas
+        // E_2 at z~102 (gap z[100,104]) -- keep x[12,14] z[100,104] clear
+        this.spawnProp('trashBag.glb',      new THREE.Vector3(-0.5, 0, 108));
+        this.spawnProp('trashBag.glb',      new THREE.Vector3( 6,   0, 108.5), Math.PI / 3);
+        this.spawnProp('trashBag.glb',      new THREE.Vector3(12,   0, 96.5),  Math.PI / 5);
+        this.spawnProp('trashBag.glb',      new THREE.Vector3(12,   0, 106),   Math.PI / 7);
+        this.spawnProp('trashBin.glb',      new THREE.Vector3(-0.5, 0, 104.5));
+        this.spawnProp('bucket.glb',        new THREE.Vector3(12.5, 0, 96));
+        this.spawnProp('tableLamp.glb',     new THREE.Vector3(-0.5, 0, 98));
+        // Cracked mirror on west wall -- E_2 at z~102 on east wall; west wall clear
         this.spawnWallProp('mirror.glb',    'W', -2, 102, 0, 1.8);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM J — ANTECHAMBER TO THE LAIR
-        // Mood: transitional. Once a noble's sitting room, now abandoned.
+        // ===========================================================
+        // ROOM J - ANTECHAMBER TO THE LAIR
+        // Mood: transitional. Sofa against east wall, small table against south.
         // cx=60, cz=106  bounds x[54,70]  z[98,114]
-        // (tx=14,tz=25, 3×3 → cx=14*4+3*2-2=60, cz=25*4+3*2-2=106)
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(60, 106, 5.5, 0.5, 10, TORCH_DIM, true);
+        // Doors: W_1 (west row 1 -> z~104), N_1 (north col 1 -> x~58)
+        // ===========================================================
 
-        this.spawnProp('couchSmall2.glb',   new THREE.Vector3(56, 0, 106),  Math.PI / 2);
-        this.spawnProp('tableSmall.glb',    new THREE.Vector3(62, 0, 104));
-        this.spawnProp('plant.glb',         new THREE.Vector3(68, 0, 112));
-        this.spawnProp('trashBin.glb',      new THREE.Vector3(56, 0, 112));
-        this.spawnWallProp('painting2.glb', 'S', 60, 114, 0, 2.2);
+        // Sofa against east wall (x=70), facing west. W_1 at z~104, N_1 at x~58.
+        // E_0 is not a door here. Sofa at z=106 (room centre north-south is clear)
+        this.spawnProp('couchSmall2.glb',   new THREE.Vector3(68.5, 0, 106), -Math.PI / 2);
+        // Small table against south wall (z=114). W_1 at z~104 on west -- south wall clear
+        this.spawnProp('tableSmall.glb',    new THREE.Vector3(62, 0, 112.5));
+        // Plant in SE corner (x=68, z=113) -- clear of both doors
+        this.spawnProp('plant.glb',         new THREE.Vector3(68.5, 0, 113));
+        // Trash bin in SW corner (x=55, z=113) -- W_1 at z~104, corner at z=113 is safe
+        this.spawnProp('trashBin.glb',      new THREE.Vector3(55, 0, 113));
+        // Painting on south wall
+        this.spawnWallProp('painting2.glb', 'S', 62, 114, 0, 2.2);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM K — FORGOTTEN UPPER LEVEL
-        // Mood: old library / records room left untouched for years.
-        // cx=30, cz=-14  bounds x[22,38]  z[-22,-6]
-        // (tx=6,tz=-8, 4×3 → cx=6*4+4*2-2=30, cz=-8*4+3*2-2=-26)
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(28, -18, 5.5, 0.6, 10, TORCH_DIM);
-        this.spawnCeilingLamp(34, -12, 5.5, 0.6, 10, TORCH_DIM, true);
+        // ===========================================================
+        // ROOM K - FORGOTTEN UPPER LEVEL
+        // Mood: old records room. Bookshelves against north wall, reading
+        // chair in east corner.
+        // bounds x[22,38]  z[-22,-6]
+        // Doors: S_2 (south col 2 -> x~30), W_1 (west row 1 -> z~14 -> z~-14)
+        // ===========================================================
 
-        // Bookshelf along north wall
-        this.spawnProp('bookshelf.glb',     new THREE.Vector3(24, 0, -20));
-        this.spawnProp('bookshelf.glb',     new THREE.Vector3(28, 0, -20));
-        this.spawnProp('bookStack2.glb',    new THREE.Vector3(32, 0, -20));
-        // Reading chair with side table
-        this.spawnProp('chair.glb',         new THREE.Vector3(36, 0, -14),  Math.PI / 2);
-        this.spawnProp('tableSmall3.glb',   new THREE.Vector3(36, 0, -10));
-        this.spawnProp('tableLamp.glb',     new THREE.Vector3(36, 0, -10));
-        // Wall shelf with books above
+        // Bookshelves against north wall (z=-22). No north door -- full row
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(24, 0, -20.5));
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(28, 0, -20.5));
+        this.spawnProp('bookStack2.glb',    new THREE.Vector3(32, 0, -20.5));
+        // Reading chair in east corner (x=37, z=-8) -- S_2 at x~30, east corner x=37 is safe
+        this.spawnProp('chair.glb',         new THREE.Vector3(36.5, 0, -7.5), Math.PI / 2);
+        this.spawnProp('tableSmall3.glb',   new THREE.Vector3(36.5, 0, -11));
+        this.spawnProp('tableLamp.glb',     new THREE.Vector3(36.5, 0.85, -11));
+        // Wall shelf above bookshelves
         this.spawnWallProp('wallShelf2.glb','N', 28, -22, 0, 1.8);
+        // Trash bag in SW corner -- W_1 at z~-14, SW corner at z=-21 is safe
+        this.spawnProp('trashBag.glb',      new THREE.Vector3(23, 0, -21));
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM L — FLOODED BASEMENT (debris)
-        // Mood: abandoned utility area. Buckets, ladders, decay.
-        // cx=2, cz=-26  bounds x[-10,10]  z[-34,-18]
-        // (tx=-2,tz=-9, 3×4 → cx=-2*4+3*2-2=0, cz=-9*4+4*2-2=-30)
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(0, -26, 5.5, 0.5, 9, TORCH_DIM, true);
+        // ===========================================================
+        // ROOM L - FLOODED BASEMENT (debris)
+        // Mood: abandoned utility. All junk against walls.
+        // bounds x[-10,10]  z[-34,-18]
+        // Doors: E_2 (east row 2 -> z~-26), S_2 (south col 2 -> x~2)
+        // ===========================================================
 
-        this.spawnProp('ladder.glb',        new THREE.Vector3(-2, 0, -28));
-        this.spawnProp('bucket.glb',        new THREE.Vector3( 6, 0, -28));
-        this.spawnProp('bucket.glb',        new THREE.Vector3( 8, 0, -22),  Math.PI / 3);
-        
-        // Abandoned sanitary equipment dumped here
-        this.spawnProp('toilet.glb',        new THREE.Vector3( 8, 0, -26), Math.PI);
-        this.spawnProp('radiator.glb',      new THREE.Vector3( 0, 0, -20), -Math.PI / 2);
-        
-        this.spawnProp('trashBin.glb',      new THREE.Vector3( 6, 0, -20));
-        this.spawnProp('trashBag.glb',      new THREE.Vector3(-4, 0, -22),  Math.PI / 2);
-        this.spawnProp('trashBag.glb',      new THREE.Vector3(-2, 0, -24));
+        // Ladder against west wall (x=-10). No west door -- full clear
+        this.spawnProp('ladder.glb',        new THREE.Vector3(-8.5, 0, -28));
+        // Buckets against north wall (z=-34). No north door -- full clear
+        this.spawnProp('bucket.glb',        new THREE.Vector3(-6,   0, -32.5));
+        this.spawnProp('bucket.glb',        new THREE.Vector3( 6,   0, -32.5));
+        // Toilet against east wall (x=10). E_2 at z~-26 (gap z[-28,-24]) -- place at z=-32 (north of door)
+        this.spawnProp('toilet.glb',        new THREE.Vector3( 8.5, 0, -32), Math.PI);
+        // Radiator against south wall (z=-18). S_2 at x~2 (gap x[0,4]) -- place at x=-6 (west corner)
+        this.spawnProp('radiator.glb',      new THREE.Vector3(-6,   0, -19),  0);
+        // Trash and bags against west and north walls
+        this.spawnProp('trashBin.glb',      new THREE.Vector3( 8.5, 0, -20));
+        this.spawnProp('trashBag.glb',      new THREE.Vector3(-8.5, 0, -22));
+        this.spawnProp('trashBag.glb',      new THREE.Vector3(-8.5, 0, -30));
+        // Breaker box on west wall
         this.spawnWallProp('breakerBox.glb','W', -10, -26, 0, 1.4, 0.2);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM M — INNER SANCTUM / GOAL ROOM
-        // Mood: the best-preserved room. A noble study with intact furniture.
-        // Warm, almost welcoming after the horrors outside.
-        // cx=104, cz=18  bounds x[98,110]  z[6,30]
-        // (tx=25,tz=2, 3×6 → cx=25*4+3*2-2=104, cz=2*4+6*2-2=18)
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp(104, 10, 5.5, 0.8, 12, 0xfff0cc);         // warm, not orange
-        this.spawnCeilingLamp(104, 20, 5.5, 0.8, 12, 0xfff0cc);
-        this.spawnCeilingLamp(104, 28, 5.5, 0.8, 10, 0xfff0cc);
+        // ===========================================================
+        // ROOM M - INNER SANCTUM / GOAL ROOM
+        // Mood: best-preserved. Sofa against west wall, desk against north wall.
+        // bounds x[98,110]  z[6,30]
+        // Doors: W_1 (west row 1 -> z~12), S_1 (south col 1 -> x~102)
+        // ===========================================================
 
-        // Throne-like armchair / grand sofa against west wall
-        this.spawnProp('couchBig.glb',      new THREE.Vector3(100, 0, 12),  Math.PI / 2);
-        // Coffee table in front
-        this.spawnProp('tableSmall2.glb',   new THREE.Vector3(104, 0, 12));
-        this.spawnProp('tableLamp.glb',     new THREE.Vector3(104, 0, 11));
-        // Desk with chair against north wall
-        this.spawnProp('table2.glb',        new THREE.Vector3(104, 0,  8));
-        this.spawnProp('chair.glb',         new THREE.Vector3(104, 0, 10),  Math.PI);
-        this.spawnProp('bookStack.glb',     new THREE.Vector3(102, 0,  7));
-        // Sideboard along east wall
-        this.spawnProp('sideboard2.glb',    new THREE.Vector3(108, 0, 20));
-        // Plants in corners (well-maintained)
-        this.spawnProp('plant2.glb',        new THREE.Vector3(108, 0, 28));
-        this.spawnProp('plant.glb',         new THREE.Vector3(100, 0, 28));
-        // Central carpet
+        // Sofa against west wall (x=98). W_1 at z~12 (gap z[10,14]) -- sofa at z=20 (south of door)
+        this.spawnProp('couchBig.glb',      new THREE.Vector3(99.5, 0, 20),  Math.PI / 2);
+        // Coffee table in front of sofa
+        this.spawnProp('tableSmall2.glb',   new THREE.Vector3(102, 0, 20));
+        this.spawnProp('tableLamp.glb',     new THREE.Vector3(102, 0.7, 20));
+        // Desk against north wall (z=6). N wall has no door -- x=104 (centre east section)
+        // S_1 at x~102, so desk at x=106 avoids the south door zone
+        this.spawnProp('table2.glb',        new THREE.Vector3(106, 0,  7.5));
+        this.spawnProp('chair.glb',         new THREE.Vector3(106, 0,  9.5),  Math.PI);
+        this.spawnProp('bookStack.glb',     new THREE.Vector3(106, 0,  7));
+        // Sideboard against east wall (x=110). No east door -- full clear
+        this.spawnProp('sideboard2.glb',    new THREE.Vector3(108.5, 0, 20));
+        // Plants in corners -- S_1 at x~102 on south wall
+        // SW corner (x=99, z=29) -- S_1 at x~102 so x=99 is safe
+        this.spawnProp('plant2.glb',        new THREE.Vector3(99.5, 0, 28.5));
+        // NE corner (x=109, z=7) -- all walls clear at NE
+        this.spawnProp('plant.glb',         new THREE.Vector3(109, 0, 7.5));
+        // Carpet in centre
         this.spawnProp('carpet.glb',        new THREE.Vector3(104, 0.01, 18));
-        // Wall decorations: regal paintings
-        this.spawnWallProp('painting4.glb', 'W',  98, 16, 0, 2.4);
+        // Wall deco: regal paintings
+        this.spawnWallProp('painting4.glb', 'W',  98, 20, 0, 2.4);
         this.spawnWallProp('mirror2.glb',   'N', 104,  6, 0, 1.9);
         this.spawnWallProp('clock.glb',     'E', 110, 18, 0, 2.4);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ROOM N — LIBRARY WING
-        // Mood: a scholar's paradise. Bookshelves, a reading desk, plants.
-        // cx=98, cz=70  bounds x[90,106]  z[62,78]
-        // (tx=24,tz=16, 4×4 → cx=24*4+4*2-2=98, cz=16*4+4*2-2=70) — recalc: 96+8-2=102? No: 24*4=96, 96+8-2=102
-        // Actually: cx=24*4+4*2-2=96+8-2=102... let me just reuse confirmed from earlier: 98/66
-        // Use safe middle coords: x[94,110] z[62,78]
-        // ═══════════════════════════════════════════════════════════════
-        this.spawnCeilingLamp( 98, 66, 5.5, 0.6, 12, TORCH_DIM);
-        this.spawnCeilingLamp(104, 74, 5.5, 0.6, 12, TORCH_DIM, true);
+        // ===========================================================
+        // ROOM N - LIBRARY WING
+        // Mood: scholar's paradise. Bookshelves against north and east walls.
+        // bounds x[90,106]  z[62,78]
+        // Doors: N_2 (north col 2 -> x~98), W_1 (west row 1 -> z~70)
+        // ===========================================================
 
-        // Reading desk and chair
-        this.spawnProp('table2.glb',        new THREE.Vector3( 96, 0, 70));
-        this.spawnProp('chair.glb',         new THREE.Vector3( 94, 0, 70),  Math.PI / 2);
-        this.spawnProp('tableLamp.glb',     new THREE.Vector3( 96, 0, 69));
-        this.spawnProp('bookStack.glb',     new THREE.Vector3( 97, 0, 69));
-        // Bookshelves along walls
-        this.spawnProp('bookshelf.glb',     new THREE.Vector3(103, 0, 64), -Math.PI / 2);
-        this.spawnProp('bookshelf.glb',     new THREE.Vector3(103, 0, 76), -Math.PI / 2);
-        this.spawnProp('bookStack2.glb',    new THREE.Vector3( 94, 0, 76));
-        // Plant in corner
-        this.spawnProp('plant.glb',         new THREE.Vector3( 94, 0, 64));
+        // Reading desk against west wall (x=90). W_1 at z~70 (gap z[68,72]) -- desk at z=64 (north of door)
+        this.spawnProp('table2.glb',        new THREE.Vector3(91.5, 0, 64));
+        this.spawnProp('chair.glb',         new THREE.Vector3(93.5, 0, 64),  -Math.PI / 2);
+        this.spawnProp('tableLamp.glb',     new THREE.Vector3(91.5, 1.16, 63.5));
+        this.spawnProp('bookStack.glb',     new THREE.Vector3(91.5, 0, 65));
+        // Bookshelves against east wall (x=106). N_2 at x~98 on north, no east door. Full east wall clear.
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(104.5, 0, 64), -Math.PI / 2);
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(104.5, 0, 72), -Math.PI / 2);
+        // Bookshelves against south wall (z=78). No south door -- full clear
+        this.spawnProp('bookshelf.glb',     new THREE.Vector3(94, 0, 76.5));
+        this.spawnProp('bookStack2.glb',    new THREE.Vector3(91, 0, 76.5));
+        // Plant in SW corner -- W_1 at z~70, SW corner at z=77 is safe
+        this.spawnProp('plant.glb',         new THREE.Vector3(91, 0, 76.5));
         // Wall deco
-        this.spawnWallProp('painting3.glb', 'N',  98, 62, 0, 2.2);
+        this.spawnWallProp('painting3.glb', 'N',  94, 62, 0, 2.2);
         this.spawnWallProp('clock.glb',     'E', 106, 70, 0, 2.4);
 
-        // ═══════════════════════════════════════════════════════════════
-        // HALLWAYS — torches every ~8m; radiators replaced by crates/debris
-        // ═══════════════════════════════════════════════════════════════
-        // H1 (A→B): cx=18,cz=4  bounds x[10,26] z[2,6]
-        this.spawnCeilingLamp(14, 4, 5.5, 0.5, 8, TORCH);
-        this.spawnCeilingLamp(22, 4, 5.5, 0.5, 8, TORCH, true);
+        // ===========================================================
+        // HALLWAYS - torches every ~8m
+        // ===========================================================
+        // H1 (A->B): bounds x[10,26] z[2,6]
 
-        // H2 (A→C): cx=6,cz=18  bounds x[2,10] z[10,30]
-        this.spawnCeilingLamp( 6, 14, 5.5, 0.4, 7, TORCH_DIM, true);
-        this.spawnCeilingLamp( 6, 22, 5.5, 0.4, 7, TORCH_DIM);
-        this.spawnCeilingLamp( 6, 28, 5.5, 0.4, 7, TORCH_DIM, true);
+        // H2 (A->C): bounds x[2,10] z[10,30]
 
-        // H3 (B→D): cx=38,cz=18  bounds x[34,42] z[14,30]
-        this.spawnCeilingLamp(38, 18, 5.5, 0.4, 7, TORCH_DIM);
-        this.spawnCeilingLamp(38, 26, 5.5, 0.4, 7, TORCH_DIM, true);
+        // H3 (B->D): bounds x[34,42] z[14,30]
 
-        // H4 (B→E): cx=46,cz=6  bounds x[42,54] z[6,10]
-        this.spawnCeilingLamp(46, 8, 5.5, 0.5, 8, TORCH);
-        this.spawnCeilingLamp(52, 8, 5.5, 0.5, 8, TORCH, true);
+        // H4 (B->E): bounds x[42,54] z[6,10]
 
-        // H7 (C→G): cx=2,cz=58  bounds x[-2,6] z[46,66]
-        this.spawnCeilingLamp( 2, 50, 5.5, 0.4, 7, TORCH_DIM, true);
-        this.spawnCeilingLamp( 2, 58, 5.5, 0.4, 7, TORCH_DIM);
+        // H7 (C->G): bounds x[-2,6] z[46,66]
 
-        // H16 (G→H): cx=30,cz=74  bounds x[10,58] z[70,78] (wide!)
-        this.spawnCeilingLamp(20, 74, 5.5, 0.4, 8, TORCH_DIM);
-        this.spawnCeilingLamp(34, 74, 5.5, 0.4, 8, TORCH_DIM, true);
-        this.spawnCeilingLamp(48, 74, 5.5, 0.4, 8, TORCH_DIM);
+        // H16 (G->H): bounds x[10,58] z[70,78] (wide!)
 
-        // H17 (G→I): cx=6,cz=90  bounds x[2,10] z[78,102]
-        this.spawnCeilingLamp( 6, 82, 5.5, 0.4, 7, TORCH_DIM, true);
-        this.spawnCeilingLamp( 6, 90, 5.5, 0.4, 7, TORCH_DIM);
-        this.spawnCeilingLamp( 6, 98, 5.5, 0.4, 7, TORCH_DIM, true);
+        // H17 (G->I): bounds x[2,10] z[78,102]
 
-        // H20 (I→J): cx=22,cz=106  bounds x[14,54] z[102,110]
-        this.spawnCeilingLamp(22, 106, 5.5, 0.4, 8, TORCH_DIM);
-        this.spawnCeilingLamp(38, 106, 5.5, 0.4, 8, TORCH_DIM, true);
+        // H20 (I->J): bounds x[14,54] z[102,110]
 
-        // H13 (E→M): cx=58,cz=8  bounds x[74,98] z[6,10]
-        this.spawnCeilingLamp(80, 8, 5.5, 0.5, 8, TORCH, true);
-        this.spawnCeilingLamp(92, 8, 5.5, 0.5, 8, TORCH);
+        // H13 (E->M): bounds x[74,98] z[6,10]
 
-        // H24 (M→N): cx=106,cz=38  bounds x[102,110] z[30,62]
-        this.spawnCeilingLamp(106, 38, 5.5, 0.4, 7, TORCH_DIM);
-        this.spawnCeilingLamp(106, 50, 5.5, 0.4, 7, TORCH_DIM, true);
+        // H24 (M->N): bounds x[102,110] z[30,62]
 
-        // H25 (H→N): cx=82,cz=74  bounds x[70,102] z[70,78]
-        this.spawnCeilingLamp(78, 74, 5.5, 0.4, 8, TORCH_DIM, true);
-        this.spawnCeilingLamp(90, 74, 5.5, 0.4, 8, TORCH_DIM);
+        // H25 (H->N): bounds x[70,102] z[70,78]
+
 
         // ── Trigger horror (Regista) ──────────────────────────────────
         // J: Antechamber to the lair, cx=58 cz=106 — ultimo jumpscare prima della tana
@@ -537,3 +521,4 @@ export class MapHard extends MapBase {
         this.spawnBattery(new THREE.Vector3(8,  0, 72), 'batteria_hard_3');
     }
 }
+
