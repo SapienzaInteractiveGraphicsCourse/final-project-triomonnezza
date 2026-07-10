@@ -41,6 +41,7 @@ export class MonsterAI {
             stuckCheckTimer: 0,      // accumula deltaTime per check periodico
             hasEverSeenPlayer: false, // true se ha mai visto il giocatore
             dynamicTeleportTimer: 0, // timer per il teletrasporto passivo
+            blockedVisuallyTimer: 0, // timer di blocco visivo dietro ostacoli
         };
     }
 
@@ -251,7 +252,29 @@ export class MonsterAI {
         }
 
         // ── Condizione di Inseguimento ────────────────────────────────────────
-        if (distanzaEuclidea > this.aggroRadius) return;
+        if (distanzaEuclidea > this.aggroRadius) {
+            ai.blockedVisuallyTimer = 0;
+            return;
+        }
+
+        // ── Controllo Blocco Visivo (Ostacoli tra Mostro e Giocatore) ─────────
+        if (!this._hasLineOfSightToPlayer()) {
+            ai.blockedVisuallyTimer += deltaTime;
+            if (ai.blockedVisuallyTimer >= 6.0) {
+                ai.blockedVisuallyTimer = 0;
+                // Forza il teletrasporto nella stanza adiacente
+                this._teleportMonsterNearPlayer(12, 20);
+                ai.lastPos.copy(this.mesh.position);
+                
+                // Resetta anche gli altri timer di blocco per evitare conflitti
+                ai.stuckTimer = 0;
+                ai.escapeDir = null;
+                ai.escapeClock = 0;
+                return;
+            }
+        } else {
+            ai.blockedVisuallyTimer = 0;
+        }
 
         this.mesh.lookAt(this.camera.position.x, this.mesh.position.y, this.camera.position.z);
 
