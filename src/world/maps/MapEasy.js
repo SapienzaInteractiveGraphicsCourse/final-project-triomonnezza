@@ -43,6 +43,7 @@ export class MapEasy extends MapBase {
             this.buildRoomByTiles(tx, tz, cols, rows, doors, WP);
             const cx = tx * 4 + cols * 2 - 2;
             const cz = tz * 4 + rows * 2 - 2;
+            this.spawnCeilingLamp(cx, cz, 5.5, 0.75, Math.max(cols, rows) * 4.5, lampColor, flickers);
             if (isBigRoom) {
                 this.autoPopulateBigRoom(tx, tz, cols, rows, doors, easyAllowedAssets);
             }
