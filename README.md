@@ -1,58 +1,145 @@
-# 🧟‍♂️ Horror Labyrinth – Interactive Graphics Final Project
+# 🧟‍♂️ Echoes in the Dark (formerly Horror Labyrinth)
 
-## 🔗 GitHub Pages Live Demo
-**👉 [https://sapienzainteractivegraphicscourse.github.io/final-project-triomonnezza/](https://sapienzainteractivegraphicscourse.github.io/final-project-triomonnezza/)**
+**Sapienza University of Rome - Interactive Graphics Course Final Project**
+
+## 🔗 Live Demo
+**👉 [Play the Game Here](https://sapienzainteractivegraphicscourse.github.io/final-project-triomonnezza/)**
 
 ## 👥 Team: Trio Monnezza
-| Studente | Matricola |
+| Student | Matricola |
 |---|---|
 | Davide Timperi | 1950722 |
 | Alexandru Vivian Pita | 1948533 |
 | Federico Mendiola | 1986026 |
 
-## 📖 Specifiche del Progetto e Motivazione
-Questo progetto è un gioco horror interattivo in 3D sviluppato in WebGL per l'esame finale del corso di **Interactive Graphics** presso l'Università La Sapienza di Roma. 
-La motivazione alla base del progetto è creare un ambiente immersivo e spaventoso in cui il giocatore deve esplorare un labirinto, risolvere enigmi o interazioni e cercare di sopravvivere scappando da un mostro gestito da un'Intelligenza Artificiale che lo insegue.
+---
 
-Il progetto sfrutta `three.js` per il rendering di modelli complessi, strutture gerarchiche, materiali e un sistema di illuminazione dinamico, rispettando a pieno i requisiti tecnici richiesti dal corso (modelli gerarchici, asset complessi, luci, texture di vario tipo e interazione con l'utente).
+## 📖 1. Project Overview
+**Echoes in the Dark** is a fully 3D, first-person psychological horror survival game developed entirely in **WebGL** and **Three.js**. Created as the final project for the Interactive Graphics course at Sapienza University of Rome, it pushes the boundaries of browser-based gaming without relying on heavy game engines like Unity or Unreal Engine.
 
-## 📂 Panoramica della Repository
-La repository è strutturata nei seguenti file e cartelle principali:
-
-- **`index.html`**: Il punto di ingresso principale dell'applicazione web.
-- **`main.js`**: Lo script centrale per il setup e l'inizializzazione del gioco.
-- **`assets_list.js`**: Un indice che elenca tutti i modelli 3D in formato `.glb` disponibili (blocchi geometrici e oggetti di scena).
-- **`download_libs.py`**: Uno script Python utile per scaricare eventuali librerie esterne necessarie.
-- **`assets/`**: Contiene tutti gli asset visivi e audio del gioco.
-  - **`models/`**: I file `.glb` per l'architettura (`geomAssets`) e per l'arredamento (`propAssets`).
-  - **`sounds/`**: File audio per l'atmosfera e gli effetti sonori.
-  - **`ui/`**: Grafiche e icone per l'interfaccia utente.
-- **`src/`**: Il codice sorgente con la logica del gioco.
-  - **`animations/`**: Gestione delle animazioni e dei tween (`MonsterAnimator.js`, `TweenManager.js`).
-  - **`core/`**: Logica di base del gameplay, tra cui `MonsterAI.js` per l'IA del mostro e `PlayerController.js` per il giocatore.
-  - **`entities/`**: Entità del gioco (es. `Monster.js`).
-  - **`ui/`**: Gestione dell'interfaccia e dei menu (`HUD.js`, `MenuManager.js`).
-  - **`world/`**: Script per la costruzione e l'illuminazione delle mappe (`InteriorAssetManager.js`, `CollisionBuilder.js`, `LightingSetup.js`, `TextureLoader.js`), più la cartella `maps/` con le configurazioni dei vari livelli di difficoltà (`MapBase.js`, `MapEasy.js`, `MapMedium.js`, `MapHard.js`).
-
-## 🛋️ Come sono realizzati gli Asset
-Il progetto utilizza modelli 3D in formato **`.glb`** (GL Transmission Format), un formato binario che racchiude geometrie, materiali e texture in un unico file ottimizzato per il web. Gli asset si dividono in due categorie:
-- **Asset Geometrici Strutturali (`geomAssets`)**: Sono moduli architettonici (muri, pavimenti, soffitti, pilastri, scale) costruiti basandosi su una griglia standard. Affiancando questi blocchi è possibile comporre dinamicamente la planimetria del labirinto, garantendo coerenza nelle dimensioni.
-- **Asset di Scena / Arredamento (`propAssets`)**: Sono singoli elementi d'arredo (letti, sedie, lampade, libri, scatole, ecc.). Sono stati modellati e texturizzati per mantenere proporzioni realistiche rispetto ai muri e all'ambiente. In questo modo possono essere posizionati senza subire distorsioni di scala.
+The player is trapped in a procedurally styled, claustrophobic labyrinth. The ultimate goal is to locate a **Hidden Key** and escape through the **Goal Door**. However, the maze is actively patrolled by a relentless, procedurally-animated monster. Survival depends on resource management, stealth, and spatial awareness.
 
 ---
 
-## 🤖 Prompt per Claude / Codex (Assistente Arredamento Mappe)
+## 🕹️ 2. Core Gameplay Mechanics
 
-Se sei un LLM (come Claude o Codex) incaricato di arredare le mappe del gioco, segui attentamente questo prompt:
+### 🏃 The Player & Stamina System
+- **First-Person Controls:** Standard WASD movement with mouse-look controls.
+- **Stamina Management:** Sprinting (holding `Spacebar`) rapidly depletes the stamina bar. If stamina hits zero, the player is forced into a slow walk state until the bar partially recharges.
+- **Immersive Head-Bobbing:** Procedural camera motions using trigonometric functions (`Math.sin()`, `Math.cos()`) simulate realistic walking and running gaits.
 
-> **Ruolo:** Sei un esperto di level design 3D per un gioco horror in WebGL. **Le mappe strutturali (muri, pavimenti, corridoi e stanze) sono già state costruite e definite.** Il tuo unico compito è **arredare le stanze già esistenti**, inserendo gli oggetti di scena disponibili per creare ambienti realistici e a tema (es. camere da letto, bagni, salotti, ripostigli).
-> 
-> **Modelli da Utilizzare:** Devi usare ESCLUSIVAMENTE i modelli 3D definiti nell'array `propAssets` (presente in `assets_list.js`). Alcuni esempi sono `bed.glb`, `bookshelf.glb`, `cabinet.glb`, `chair.glb`, `table.glb`, `plant.glb`, `ceilingLight.glb`, ecc.
-> 
-> **Regole di Proporzione e Posizionamento:**
-> 1. **Rispetta le Proporzioni Reali:** Gli asset sono modellati in scala reale. Quando definisci la traslazione `(x, y, z)`, posiziona gli oggetti in modo logico. Ad esempio, un `book.glb` o una `cup.glb` devono stare *sopra* un `table.glb` o un mobile, il che significa che la loro coordinata `y` (altezza) deve corrispondere a quella della superficie del tavolo. Un `ceilingLight.glb` deve avere una coordinata `y` vicina al soffitto.
-> 2. **Evita le Collisioni e Rispetta il Passaggio:** Non sovrapporre due oggetti fisici nello stesso spazio e lascia sempre lo spazio sufficiente per far camminare il giocatore nella stanza.
-> 3. **Coerenza Tematica:** Raggruppa gli oggetti in base al tipo di stanza. Un bagno richiede `toilet.glb`, `bathtub.glb`, `bathroomSink.glb` e `mirror.glb`. Un ripostiglio potrebbe essere disordinato e pieno di `box.glb`, `pallet.glb` e `trashBag.glb`.
-> 4. **Orientamento (`rotation`):** Ruota gli oggetti in modo logico. Un `bed.glb` dovrebbe avere la testiera contro un muro. Una `tv.glb` dovrebbe essere rivolta verso un `couchBig.glb`.
-> 
-> Fornisci in output il codice di configurazione o le coordinate JSON per iniettare questi oggetti nelle stanze specifiche, mantenendo un'atmosfera horror abbandonata e inquietante.
+### 🔦 Dynamic Flashlight
+- **Battery Drain:** The flashlight is the player's only light source. Its battery drains over time.
+- **Visual Degradation:** As battery decreases, the light intensity dims, the cone angle narrows, and it begins to flicker procedurally using Perlin noise, increasing tension.
+
+### 🚪 Interactive Environment
+- **Doors:** Players can approach doors and press `E` to interact. Doors act as physical barriers and break the monster's line of sight, allowing players to hide in rooms.
+- **The Objective:** The player must explore rooms to find the **Key**. Once acquired, the player must navigate to the **Goal Door** (distinguished by a green light) to escape.
+
+### 👹 The Monster
+- An invincible entity that stalks the player. You cannot fight it; you can only run and hide.
+- If the monster catches the player, a procedural jump-scare animation plays, and the game is over.
+
+---
+
+## 🛠️ 3. Technical Architecture & Implementation
+
+The project strictly adheres to the course constraints, featuring custom-built systems for physics, AI, and animations rather than importing pre-made engine solutions.
+
+### 🏛️ Rendering and Environment (`Three.js`)
+- Entirely built using vanilla **JavaScript** and **Three.js**.
+- **Asset Management:** `.glb` and `.gltf` models for architecture and props are dynamically loaded. The system uses `fflate` compression for optimized asset delivery.
+- **Dynamic Level Configuration:** Levels (Easy, Medium, Hard) are defined by grid-based arrays (`MapEasy.js`, etc.) parsed by the engine to construct walls, floors, and interactive objects on the fly.
+
+### 🧠 Advanced Artificial Intelligence (`src/core/MonsterAI.js`)
+The monster operates on a custom, highly responsive State Machine:
+- **Wander State:** Patrols randomly generated nav-points within the maze.
+- **Chase State:** Continuously casts rays towards the player. If the player enters the Line of Sight (and is not blocked by walls/doors), the monster speeds up and pursues aggressively.
+- **Dynamic Teleportation:** To maintain constant psychological pressure, the AI periodically teleports to rooms adjacent to the player if they have been separated for too long. It also features failsafe emergency teleports if the monster becomes stuck in world geometry.
+
+### 🧬 Procedural Hierarchical Animations (`src/animations/MonsterAnimator.js`)
+Instead of importing pre-rigged and pre-animated meshes, the monster's animations are **100% procedurally coded**:
+- **Hierarchical Structure:** The monster is assembled using Three.js `Object3D` parent-child relationships (Torso -> Arms, Legs, Head).
+- **Trigonometric Gaits:** Walking and running cycles are calculated using alternating sine and cosine waves applied to the limbs' rotation axes.
+- **Attack Animations:** Lunges and jump-scares utilize custom Tweening (`TweenManager.js`) to snap limbs into aggressive postures rapidly.
+
+### 🧱 Custom Physics & Collision (`src/world/CollisionBuilder.js`)
+To maintain high performance in the browser, the game avoids heavy physics libraries (like Cannon.js):
+- **AABB & Raycasting:** Implements Axis-Aligned Bounding Boxes (AABB) and Raycasters to prevent the player and the monster from clipping through walls, doors, and props.
+- **Sliding Mechanics:** When colliding with a wall at an angle, the collision resolution allows the player to slide smoothly along the surface rather than stopping abruptly.
+
+### 💡 Dynamic Lighting & Texturing (`src/world/TextureLoader.js`)
+- **Spotlights & Point Lights:** Utilizes Three.js lighting models. Environmental lights flicker dynamically.
+- **Texture Mapping:** Diffuse, Normal, and Roughness maps are applied to world geometry to give depth and realism to the otherwise flat maze walls.
+
+### 🎧 Spatial Web Audio API (`src/core/AudioSystem.js`)
+- **3D Positional Audio:** Monster footsteps and roars are emitted from the monster's 3D coordinates, allowing the player to locate the threat entirely by sound.
+- **Dynamic Heartbeat System:** As the monster physically closes the distance to the player, a heartbeat sound effect dynamically increases in volume and tempo, inducing panic.
+
+---
+
+## 🤖 4. AI-Assisted Room Decoration
+
+To populate the rooms with realistic furniture layouts, the team utilized Large Language Models (LLMs like Claude/Codex) with a specific prompt structure. 
+
+The structural maps were provided to the AI, which acted as a level designer to inject 3D models from the `assets_list.js` (e.g., `bed.glb`, `bookshelf.glb`, `cabinet.glb`) into the rooms. The AI respected real-world proportions, prevented overlapping collisions, and ensured thematic consistency (e.g., grouping bathroom items together). This data is parsed by `InteriorAssetManager.js`.
+
+---
+
+## 📂 5. Repository Structure
+
+```text
+📦 final-project-triomonnezza
+├── 📂 assets/              # 3D Models (.glb), Textures, and Audio files (.wav)
+├── 📂 lib/                 # Downloaded external libraries (Three.js, etc.)
+├── 📂 src/                 # Main Source Code
+│   ├── 📂 animations/      # Procedural animation logic (MonsterAnimator, TweenManager)
+│   ├── 📂 core/            # Core systems (Player, AI, Audio, Flashlight, Doors)
+│   ├── 📂 entities/        # Game entity classes (Monster.js)
+│   ├── 📂 ui/              # User interface, Menus, HUD, Blood splatter effects
+│   └── 📂 world/           # Map generation, Collision, Textures, Asset instantiation
+│       └── 📂 maps/        # Grid-based level layouts (Easy, Medium, Hard)
+├── 📄 index.html           # Main entry point for the web application
+├── 📄 index.css            # UI styling and HUD elements
+├── 📄 main.js              # Game initialization and main render loop
+├── 📄 download_libs.py     # Script to fetch required libraries
+└── 📄 README.md            # Project documentation (You are here)
+```
+
+---
+
+## 🚀 6. How to Run Locally
+
+Since the game loads external assets (3D models, textures, sounds), it must be run via a local web server to bypass strict browser CORS policies.
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/SapienzaInteractiveGraphicsCourse/final-project-triomonnezza.git
+   cd final-project-triomonnezza
+   ```
+2. **Download libraries (if necessary):**
+   ```bash
+   python download_libs.py
+   ```
+3. **Start a local web server:**
+   - *Using Python 3:*
+     ```bash
+     python -m http.server 8000
+     ```
+   - *Using Node.js (http-server):*
+     ```bash
+     npx http-server -p 8000
+     ```
+   - *Using VS Code:* Install the "Live Server" extension and click "Go Live" on `index.html`.
+4. **Play:** Open your browser and navigate to `http://localhost:8000`.
+
+---
+
+## 🎓 7. Academic Requirements Compliance
+
+This project successfully fulfills the core requirements of the Interactive Graphics exam:
+- ✅ **WebGL & Three.js Framework:** Built entirely within the required technological stack.
+- ✅ **Hierarchical Modeling:** The monster is a complex, multi-part hierarchical mesh built in code, not a pre-animated import.
+- ✅ **Lighting and Textures:** Extensively uses Spotlights, Point lights, and multi-layered PBR textures.
+- ✅ **User Interaction:** Features complex movement, stamina, flashlight management, and interactive doors.
+- ✅ **Custom Animation:** Movement gaits and jump-scares are procedurally generated using mathematical functions and tweens.
