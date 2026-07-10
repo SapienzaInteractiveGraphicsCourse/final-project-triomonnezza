@@ -122,7 +122,7 @@ export class PlayerController {
             
             // Ruotiamo la torcia. Se punta di lato, la giriamo sull'asse Y.
             // Azzero le altre rotazioni per evitare che punti in alto o in basso.
-            object.rotation.set(0, Math.PI / 2, 0);
+            object.rotation.set(0, -Math.PI / 2, 0);
 
             this.camera.add(object);
             this.flashlightModel = object;
