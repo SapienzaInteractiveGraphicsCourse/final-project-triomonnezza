@@ -1,4 +1,4 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import { MapBase } from './MapBase.js';
 
 /**
@@ -41,6 +41,7 @@ export class MapEasy extends MapBase {
             this.buildRoomByTiles(tx, tz, cols, rows, doors, WP);
             const cx = tx * 4 + cols * 2 - 2;
             const cz = tz * 4 + rows * 2 - 2;
+            this.spawnCeilingLamp(cx, cz, 5.5, 0.6, Math.max(cols, rows) * 4, lampColor, flickers);
         };
 
         // ── Rooms ──────────────────────────────────────────────────────
@@ -64,50 +65,6 @@ export class MapEasy extends MapBase {
         // Doors: E_1 (east wall, row 1 → z≈6), S_1 (south wall, col 1 → x≈10)
         // ═══════════════════════════════════════════════════════
 
-        // Bed pushed into NW corner against north wall
-        this.spawnProp('bed.glb',          new THREE.Vector3( 2, 0, -0.5), 0);
-        // Table next to bed
-        this.spawnProp('tableSmall3.glb',  new THREE.Vector3( 6, 0, -0.5), 0);
-        // Bookshelf against east wall (z=2 is clear of E_1 door at z=6)
-        this.spawnProp('bookshelf.glb',    new THREE.Vector3(13, 0,  2), -Math.PI / 2);
-        // Plant in SW corner
-        this.spawnProp('plant.glb',        new THREE.Vector3( 0, 0,  8));
-
-        // ═══════════════════════════════════════════════════════
-        // ROOM B - KITCHEN / DINING ROOM
-        // Room B bounds x[22,38] z[-2,14]
-        // Doors: W_1 (west wall row 1 → z≈6), S_0 (south col 0 → x≈26), S_2 (south col 2 → x≈34)
-        // ═══════════════════════════════════════════════════════
-
-        // Table pushed against North wall (x=30 is safe between door lines)
-        this.spawnProp('table.glb',         new THREE.Vector3(30, 0,  1));
-        this.spawnProp('chair.glb',         new THREE.Vector3(27.5, 0,  1),  Math.PI / 2);
-        this.spawnProp('chair.glb',         new THREE.Vector3(32.5, 0,  1), -Math.PI / 2);
-        this.spawnProp('chair.glb',         new THREE.Vector3(30, 0,  3.5),  Math.PI);
-        // Bookshelf on East wall (x=37)
-        this.spawnProp('bookshelf.glb',     new THREE.Vector3(37, 0, 1), -Math.PI / 2);
-        // Plant on West wall (x=23) north of door
-        this.spawnProp('plant2.glb',        new THREE.Vector3(23, 0, 1));
-        // Small couch on West wall (x=23) south of door
-        this.spawnProp('couchSmall.glb',    new THREE.Vector3(23.5, 0, 12), Math.PI / 2);
-        
-        // ═══════════════════════════════════════════════════════
-        // ROOM C - LIVING ROOM
-        // Room C bounds x[14,26] z[18,30]
-        // Doors: N_2 (north col 2 → x≈22), W_1 (west row 1 → z≈24),
-        //        E_2 (east row 2 → z≈26), S_1 (south col 1 → x≈18)
-        // ═══════════════════════════════════════════════════════
-
-        // Bookshelf against east wall, safe from door at z=26
-        this.spawnProp('bookshelf.glb',      new THREE.Vector3(25, 0, 21), -Math.PI / 2);
-        // Couch against west wall (x=15), safe from door at z=24 (replaced table/chairs/plant)
-        this.spawnProp('couchBig.glb',       new THREE.Vector3(15.5, 0, 20), Math.PI / 2);
-
-        // ═══════════════════════════════════════════════════════
-        // ROOM D - BATHROOM (now just room)
-        // Room D bounds x[-2,10] z[22,34]
-        // Doors: N_1 (north col 1 → x≈6), E_0 (east row 0 → z≈26)
-        // ═══════════════════════════════════════════════════════
 
         // Bookshelf on West wall
         this.spawnProp('bookshelf.glb',        new THREE.Vector3( 0, 0, 29), Math.PI / 2);
@@ -150,4 +107,5 @@ export class MapEasy extends MapBase {
         this.spawnBattery(new THREE.Vector3(16, 0, 20), 'batteria_easy_1');
     }
 }
+
 

@@ -1,4 +1,4 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import { MapBase } from './MapBase.js';
 
 /**
@@ -59,6 +59,7 @@ export class MapHard extends MapBase {
             this.buildRoomByTiles(tx, tz, cols, rows, doors, BK);
             const cx = tx * 4 + cols * 2 - 2;
             const cz = tz * 4 + rows * 2 - 2;
+            this.spawnCeilingLamp(cx, cz, 5.5, 0.6, Math.max(cols, rows) * 4, lampColor, flickers);
         };
 
         // Rooms
