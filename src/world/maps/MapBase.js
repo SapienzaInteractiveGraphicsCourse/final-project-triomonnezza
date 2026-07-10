@@ -991,23 +991,15 @@ export class MapBase {
         if (swCornerAvailable) spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(westX + 1.5, 0, southZ - 1.5), Math.PI);
         if (seCornerAvailable) spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(eastX - 1.5, 0, southZ - 1.5), Math.PI);
 
-        for (let c = 1; c < cols - 1; c++) {
-            if (!occupiedN.has(c)) {
-                spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(startX + c * 4, 0, northZ + 1), 0);
-            }
-            if (!occupiedS.has(c)) {
-                spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(startX + c * 4, 0, southZ - 1.5), Math.PI);
-            }
-        }
+        const nMiddleAvailable = cols >= 3 && [...Array(cols-2).keys()].every(i => !occupiedN.has(i+1));
+        const sMiddleAvailable = cols >= 3 && [...Array(cols-2).keys()].every(i => !occupiedS.has(i+1));
+        const wMiddleAvailable = rows >= 3 && [...Array(rows-2).keys()].every(i => !occupiedW.has(i+1));
+        const eMiddleAvailable = rows >= 3 && [...Array(rows-2).keys()].every(i => !occupiedE.has(i+1));
 
-        for (let r = 1; r < rows - 1; r++) {
-            if (!occupiedW.has(r)) {
-                spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(westX + 1.5, 0, startZ + r * 4), Math.PI / 2);
-            }
-            if (!occupiedE.has(r)) {
-                spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(eastX - 1.5, 0, startZ + r * 4), -Math.PI / 2);
-            }
-        }
+        if (nMiddleAvailable) spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(cx, 0, northZ + 1), 0);
+        if (sMiddleAvailable) spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(cx, 0, southZ - 1.5), Math.PI);
+        if (wMiddleAvailable) spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(westX + 1.5, 0, cz), Math.PI / 2);
+        if (eMiddleAvailable) spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(eastX - 1.5, 0, cz), -Math.PI / 2);
     }
 
     async load() {

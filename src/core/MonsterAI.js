@@ -38,6 +38,8 @@ export class MonsterAI {
             attackResolved: false,   // true dopo che 'playerMorto' è già stato dispatchato per questo attacco
             hasNoticedPlayer: false, // true dopo lo "shock" di scoperta iniziale (Regista)
             stuckCheckTimer: 0,      // accumula deltaTime per check periodico
+            hasEverSeenPlayer: false, // true se ha mai visto il giocatore
+            dynamicTeleportTimer: 0, // timer per il teletrasporto passivo
         };
     }
 
@@ -109,11 +111,11 @@ export class MonsterAI {
      * Rete di sicurezza: teletrasporta il mostro a distanza ravvicinata al
      * giocatore quando resta bloccato troppo a lungo.
      */
-    _teleportMonsterNearPlayer() {
+    _teleportMonsterNearPlayer(minRadius = 6, maxRadius = 10) {
         if (!this.mesh || !this.camera) return;
 
         const player = this.camera.position;
-        const radius = 6 + Math.random() * 4; // 6-10 unità: vicino ma non addosso
+        const radius = minRadius + Math.random() * (maxRadius - minRadius);
         const testSize = new THREE.Vector3(1.5, 2.8, 1.5); // stesso ingombro usato per lo steering
 
         for (let attempt = 0; attempt < 8; attempt++) {
@@ -155,12 +157,24 @@ export class MonsterAI {
 
         // ── "Shock" alla prima individuazione (Regista) ────────────────────────
         if (distanzaEuclidea <= this.aggroRadius) {
+            ai.hasEverSeenPlayer = true;
             if (!ai.hasNoticedPlayer) {
                 ai.hasNoticedPlayer = true;
                 this._dispatchGlobalEvent('mostroNotaGiocatore', { mostro: this.mesh });
             }
         } else {
             ai.hasNoticedPlayer = false;
+        }
+
+        // ── Inseguimento Passivo (Teletrasporto Dinamico) ─────────────────────
+        if (!ai.hasEverSeenPlayer) {
+            ai.dynamicTeleportTimer += deltaTime;
+            if (ai.dynamicTeleportTimer >= 5.0) {
+                ai.dynamicTeleportTimer = 0;
+                // Teletrasporta il mostro in una "stanza adiacente" (12-20 unità)
+                this._teleportMonsterNearPlayer(12, 20);
+                ai.lastPos.copy(this.mesh.position);
+            }
         }
 
         // ── Sequenza di attacco (Regista) ─────────────────────────────────────

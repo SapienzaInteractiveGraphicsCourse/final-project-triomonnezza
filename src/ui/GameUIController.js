@@ -26,6 +26,7 @@ export class GameUIController {
         this._msgTimeout = null;
         this._phraseInterval = null;
         this._gameStarted = false;
+        this._gameOver = false;
 
         this.loadingPhrases = [
             "Hiding keys...",
@@ -99,7 +100,7 @@ export class GameUIController {
 
         // Pointerlock change (Pause/Instructions)
         document.addEventListener('pointerlockchange', () => {
-            if (!this._gameStarted) return;
+            if (!this._gameStarted || this._gameOver) return;
             const locked = !!document.pointerLockElement;
             if (this.instructions) {
                 this.instructions.style.display = locked ? 'none' : 'flex';
@@ -232,6 +233,7 @@ export class GameUIController {
     }
 
     _beginWinSequence() {
+        this._gameOver = true;
         if (this.player) this.player.controls.unlock();
 
         if (this.lightBurstOverlay) {
@@ -260,6 +262,7 @@ export class GameUIController {
     }
 
     _beginDeathSequence() {
+        this._gameOver = true;
         if (this.player) this.player.controls.unlock();
         AudioSystem.playSound('blood_splash');
         generateBloodSplatter();
