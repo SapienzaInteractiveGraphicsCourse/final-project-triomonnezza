@@ -1,0 +1,357 @@
+:root {
+    --void: #030303;
+    --void-glass: rgba(0, 0, 0, 0.9);
+    --crimson: #990000;
+    --crimson-glow: rgba(153, 0, 0, 0.6);
+    --bone: #d9d9d9;
+    --bone-dim: #777777;
+    --gold: #ccaa00;
+    --gold-glow: rgba(204, 170, 0, 0.5);
+    --stamina-full: rgba(0, 180, 0, 1); /* Green */
+    --stamina-empty: rgba(153, 0, 0, 1);
+}
+
+* {
+    box-sizing: border-box;
+    user-select: none;
+}
+
+body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    background-color: var(--void);
+    font-family: 'VT323', monospace;
+    color: var(--bone);
+    text-shadow: 1px 1px 0 #000;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated; /* PSX look for any scaled textures */
+}
+
+/* ── CRT / PSX Scanlines & Noise ── */
+.noise-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    background: 
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    background-size: 100% 4px, 3px 100%;
+    mix-blend-mode: overlay;
+}
+
+/* ── Crosshair ── */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4px;
+    height: 4px;
+    background-color: rgba(255, 255, 255, 0.8);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 10;
+    box-shadow: 1px 1px 0 #000;
+}
+#crosshair.active {
+    background-color: var(--crimson);
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--void);
+}
+
+/* ── HUD Torcia (Regista) ── */
+#torch-battery-hud {
+    position: absolute;
+    bottom: 62px;
+    left: 40px;
+    width: 250px;
+    font-size: 1.1rem;
+    color: var(--bone);
+    text-shadow: 1px 1px 0 #000;
+    z-index: 10;
+    pointer-events: none;
+    transition: color 0.2s;
+}
+#torch-battery-hud.low {
+    color: var(--crimson);
+}
+
+/* ── HUD Stamina (Blocky PSX style) ── */
+#stamina-container {
+    position: absolute;
+    bottom: 40px;
+    left: 40px;
+    width: 250px;
+    height: 16px;
+    background: #111;
+    border: 2px solid #333;
+    z-index: 10;
+    overflow: hidden;
+    box-shadow: 2px 2px 0 #000;
+}
+#stamina-bar {
+    width: 100%;
+    height: 100%;
+    background: var(--stamina-full);
+    transition: width 0.1s steps(10), background-color 0.1s steps(2);
+}
+
+/* ── HUD Inventory (Key) ── */
+#key-hud {
+    display: none; /* Iniziamente nascosto */
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    width: 64px;
+    height: 64px;
+    background: #111;
+    border: 2px solid var(--gold);
+    z-index: 15;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 2px 2px 0 #000;
+    animation: slideInUp 0.1s steps(5) forwards;
+}
+#key-hud img {
+    width: 48px;
+    height: 48px;
+    image-rendering: pixelated;
+}
+
+/* ── Interaction Prompt (PSX Style) ── */
+#interaction-prompt {
+    position: absolute;
+    top: calc(50% + 40px);
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--bone);
+    font-size: 1.8rem;
+    text-align: center;
+    pointer-events: none;
+    z-index: 5;
+    background: rgba(0,0,0,0.8);
+    border: 2px solid #333;
+    padding: 8px 16px;
+    box-shadow: 4px 4px 0 #000;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+#interaction-prompt.show {
+    opacity: 1;
+}
+
+/* ── HUD Messages (Blocky) ── */
+#hud-messages {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--bone);
+    font-size: 1.8rem;
+    text-align: center;
+    pointer-events: none;
+    z-index: 5;
+    background: rgba(0,0,0,0.8);
+    border: 2px solid #333;
+    padding: 8px 16px;
+    box-shadow: 4px 4px 0 #000;
+    opacity: 0;
+}
+#hud-messages.show {
+    opacity: 1;
+}
+
+/* ── Overlays (Menu, Loading, Instructions) ── */
+.overlay-screen {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 5, 5, 0.95);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    z-index: 30;
+    overflow-y: auto;
+    padding: 20px;
+    box-sizing: border-box;
+    opacity: 1;
+    transition: opacity 0.6s ease-in;
+}
+
+#fade-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: #000;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s steps(10);
+}
+
+/* ── Macchia di sangue sugli occhi (Regista) — SVG con blob generati in JS ── */
+#blood-splatter-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9990; /* sopra il gioco, sotto la schermata di game over (9999) */
+    pointer-events: none;
+    opacity: 0;
+}
+
+/* ── Sequenza di vittoria (Regista) — l'opposto della morte: luce che invade lo schermo ── */
+#light-burst-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9990; /* sopra il gioco, sotto la schermata di vittoria (9999) */
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(circle at 50% 50%,
+        rgba(255,250,220,0.95) 0%,
+        rgba(255,230,150,0.6) 25%,
+        rgba(255,210,100,0.15) 50%,
+        transparent 75%);
+}
+
+/* ── Main Menu Title ── */
+.title-container {
+    margin-bottom: 40px;
+}
+.glitch-text {
+    font-size: 6rem;
+    color: var(--bone);
+    margin: 0;
+    text-shadow: 4px 4px 0 var(--crimson);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+.subtitle {
+    font-size: 2rem;
+    letter-spacing: 8px;
+    color: var(--bone-dim);
+    text-transform: uppercase;
+    margin-top: 10px;
+}
+
+/* ── Menu Buttons (PSX Style) ── */
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 320px;
+}
+.diff-btn {
+    background: #111;
+    color: var(--bone);
+    border: 2px solid #444;
+    padding: 12px 0;
+    font-size: 2rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 4px 4px 0 #000;
+}
+.diff-btn:hover {
+    color: #fff;
+    border-color: var(--crimson);
+    background: #200000;
+    box-shadow: 4px 4px 0 var(--crimson);
+    transform: translate(-2px, -2px);
+}
+.diff-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 #000;
+}
+
+/* ── Loading Screen ── */
+.pulse-text {
+    color: var(--crimson);
+    font-size: 3rem;
+    letter-spacing: 4px;
+    margin-bottom: 30px;
+}
+.loading-bar-container {
+    width: 300px;
+    height: 16px;
+    background: #111;
+    border: 2px solid #444;
+    position: relative;
+}
+#loading-bar-fill {
+    position: absolute;
+    top: 0; left: 0; height: 100%;
+    width: 0%;
+    background: var(--crimson);
+    transition: width 0.3s ease-out;
+}
+#loading-text {
+    margin-top: 20px;
+    color: var(--bone-dim);
+    font-size: 1.5rem;
+    text-transform: uppercase;
+}
+
+/* ── Instructions Screen ── */
+#instructions {
+    display: none;
+    z-index: 20;
+    background: rgba(0,0,0,0.95);
+}
+#instructions .title-container {
+    margin-bottom: 10px;
+}
+#instructions .glitch-text {
+    font-size: 3rem; /* Scaled down further for pause menu */
+}
+#instructions .subtitle {
+    font-size: 1.2rem;
+    margin-bottom: 5px;
+}
+#instructions .click-prompt {
+    font-size: 1.2rem;
+    margin: 5px 0 15px;
+}
+.click-prompt {
+    font-size: 2rem;
+    color: var(--bone);
+    margin: 10px 0 20px;
+    animation: blink 2s steps(2, start) infinite;
+}
+.controls-list {
+    background: #111;
+    padding: 10px 20px;
+    border: 2px solid #333;
+    text-align: left;
+    list-style: none;
+    box-shadow: 4px 4px 0 #000;
+}
+.controls-list li {
+    margin: 8px 0;
+    color: var(--bone);
+    font-size: 1.1rem;
+}
+.kbd {
+    background: #222;
+    border: 2px solid #555;
+    padding: 2px 8px;
+    color: #fff;
+    margin-right: 15px;
+    box-shadow: 2px 2px 0 #000;
+    text-transform: uppercase;
+}
+
+/* ── Keyframes ── */
+@keyframes slideInUp {
+    from { transform: translateY(20px); }
+    to { transform: translateY(0); }
+}

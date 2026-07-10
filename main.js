@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PlayerController }      from './src/core/PlayerController.js';
 import { Monster }               from './src/entities/Monster.js';
+import { MonsterAnimator }       from './src/animations/MonsterAnimator.js';
 import { MapEasy }               from './src/world/maps/MapEasy.js';
 import { MapMedium }             from './src/world/maps/MapMedium.js';
 import { MapHard }               from './src/world/maps/MapHard.js';
@@ -8,8 +9,8 @@ import { AudioSystem }           from './src/core/AudioSystem.js';
 import { DoorController }        from './src/core/DoorController.js';
 import { FlashlightController }  from './src/core/FlashlightController.js';
 import { TweenManager }          from './src/animations/TweenManager.js';
-import { generateBloodSplatter } from './src/ui/BloodSplatter.js';
 import { MonsterAI }             from './src/core/MonsterAI.js';
+import { GameUIController }      from './src/ui/GameUIController.js';
 import * as TWEEN from '@tweenjs/tween.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,13 +32,14 @@ dirLight.position.set(10, 20, 10);
 scene.add(dirLight);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. GLOBAL GAME STATE
+// 2. GLOBAL GAME STATE & CONTROLLERS
 // ─────────────────────────────────────────────────────────────────────────────
 let currentMap  = null;
 let player      = null;
 let mostroMesh  = null;
 let monsterAI   = null;
 const monster   = new Monster();
+const monsterAnimator = new MonsterAnimator(monster, TWEEN);
 
 // Cosmetic tween manager (screen shake, item pickup fly-away, etc.)
 const tweenManager = new TweenManager(TWEEN, { scene, canvas: renderer.domElement });
@@ -45,10 +47,13 @@ const tweenManager = new TweenManager(TWEEN, { scene, canvas: renderer.domElemen
 // Flashlight controller — player is set after startGameEvent resolves
 const flashCtrl = new FlashlightController({ player: null, camera, TWEEN });
 
-// Door controller — wired to scene/audio; fires win sequence on goal door open
+// Door controller — wired to scene/audio; fires global 'horrorTrigger' GOAL_REACHED event
 const doorCtrl = new DoorController(TWEEN, scene, AudioSystem, (_group) => {
-    _beginWinSequence();
+    document.dispatchEvent(new CustomEvent('horrorTrigger', { detail: { eventName: 'GOAL_REACHED' } }));
 });
+
+// UI Controller - handles DOM overlays, menus, win/loss sequences
+const uiController = new GameUIController(null);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. DEBUG GODMODE (press G)
@@ -63,7 +68,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('playerAttaccatoDebug', () => {
-    monster.attack();
+    monsterAnimator.attack();
     document.dispatchEvent(new CustomEvent('horrorTrigger', { detail: { eventName: 'PLAYER_ATTACKED' } }));
 });
 
@@ -75,7 +80,7 @@ document.addEventListener('startGameEvent', async (e) => {
     window.currentDifficulty = difficulty;
 
     flashCtrl.reset();
-    bgmStarted = false;
+    window._bgmStarted = false;
 
     if      (difficulty === 'easy')   currentMap = new MapEasy(scene);
     else if (difficulty === 'medium') currentMap = new MapMedium(scene);
@@ -108,6 +113,7 @@ document.addEventListener('startGameEvent', async (e) => {
 
         player = new PlayerController(camera, renderer.domElement, collisionBoxes, triggerZones);
         flashCtrl.setPlayer(player);
+        uiController.player = player;
 
         monsterAI = new MonsterAI(mostroMesh, camera, currentMap.getMonsterCollisionBoxes(), currentMap.getDoors());
 
@@ -123,15 +129,6 @@ document.addEventListener('startGameEvent', async (e) => {
 // 5. GAME EVENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// BGM: starts only after pointer lock (so there's no autoplay before user gesture)
-let bgmStarted = false;
-document.addEventListener('pointerlockchange', () => {
-    if (player && player.controls.isLocked && !bgmStarted) {
-        AudioSystem.startBGM();
-        bgmStarted = true;
-    }
-});
-
 // Pointer-lock UI sounds
 document.addEventListener('pointerlockchange', () => {
     if (!player) return;
@@ -140,150 +137,30 @@ document.addEventListener('pointerlockchange', () => {
     AudioSystem.playSound(locked ? 'close_menu' : 'open_menu');
 });
 
-// Item pickup
+// Item pickup sounds (UI logic is handled in GameUIController)
 document.addEventListener('itemRaccolto', (e) => {
     const idChiave = e.detail.idChiave;
     AudioSystem.playSound('pickup');
-
+    
     if (typeof idChiave === 'string' && idChiave.startsWith('batteria')) {
-        console.log(`[GIOCO] Raccolta ${idChiave}!`);
         if (currentMap) currentMap.removeBattery(idChiave);
         flashCtrl.recharge();
-        document.dispatchEvent(new CustomEvent('logMessaggioUI', {
-            detail: { testo: 'Battery found! Flashlight fully recharged.' }
-        }));
-        return;
+    } else {
+        if (currentMap) currentMap._goalKeyGroup = null;
     }
-
-    console.log('[GIOCO] Raccolto chiave!');
-    if (currentMap) currentMap._goalKeyGroup = null;
-    document.dispatchEvent(new CustomEvent('logMessaggioUI', {
-        detail: { testo: 'Key collected! Return to the golden door.' }
-    }));
-    if (idChiave === 'chiave_goal') {
-        const keyHud = document.getElementById('key-hud');
-        if (keyHud) keyHud.style.display = 'flex';
-    }
-});
-
-// Goal-zone reached (legacy trigger path)
-document.addEventListener('horrorTrigger', (e) => {
-    console.warn(`[TRIGGER] ${e.detail.eventName}`);
-    if (e.detail.eventName === 'GOAL_REACHED') showWinScreen();
 });
 
 // Monster events
 document.addEventListener('mostroNotaGiocatore', () => {
     AudioSystem.playSound('strong_breathing');
-    monster.notice();
+    monsterAnimator.notice();
 });
 document.addEventListener('mostroAttacca', () => {
-    monster.attack();
-});
-
-// Death
-document.addEventListener('playerMorto', () => {
-    AudioSystem.playSound('blood_splash');
-    generateBloodSplatter();
-
-    const bloodOverlay = document.getElementById('blood-splatter-overlay');
-    if (bloodOverlay) {
-        bloodOverlay.style.transition = 'opacity 150ms ease-out';
-        bloodOverlay.style.opacity = '1';
-    }
-
-    document.dispatchEvent(new CustomEvent('horrorTrigger', { detail: { eventName: 'PLAYER_ATTACKED' } }));
-
-    setTimeout(() => {
-        const fadeOverlay = document.getElementById('fade-overlay');
-        if (fadeOverlay) {
-            fadeOverlay.style.transition = 'opacity 900ms ease-in';
-            fadeOverlay.style.backgroundColor = '#000';
-            fadeOverlay.style.opacity = '1';
-        }
-    }, 700);
-
-    setTimeout(showGameOverScreen, 700 + 900);
-});
-
-// UI target info
-document.addEventListener('uiTargetChanged', (e) => {
-    if (e.detail.name) console.log(`[UI] Mirino su -> ${e.detail.name}`);
+    monsterAnimator.attack();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. WIN / GAME-OVER SCREENS
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Called by DoorController when the goal door is opened */
-function _beginWinSequence() {
-    if (player) player.controls.unlock();
-
-    const lightOverlay = document.getElementById('light-burst-overlay');
-    if (lightOverlay) {
-        lightOverlay.style.transition = 'opacity 500ms ease-out';
-        lightOverlay.style.opacity = '1';
-        _generateVictorySparkles(lightOverlay);
-    }
-
-    document.dispatchEvent(new CustomEvent('logMessaggioUI', {
-        detail: { testo: 'The door opens... You are free!' }
-    }));
-
-    setTimeout(() => {
-        const fadeOverlay = document.getElementById('fade-overlay');
-        if (fadeOverlay) {
-            fadeOverlay.style.transition = 'opacity 1000ms ease-in';
-            fadeOverlay.style.backgroundColor = '#fff8ec';
-            fadeOverlay.style.opacity = '1';
-        }
-    }, 900);
-
-    setTimeout(showWinScreen, 900 + 1000);
-}
-
-function showWinScreen() {
-    if (player) player.controls.unlock();
-    const win = document.getElementById('win-overlay');
-    if (win) { win.style.display = 'flex'; void win.offsetWidth; win.style.opacity = '1'; }
-}
-
-function showGameOverScreen() {
-    if (player) player.controls.unlock();
-    const over = document.getElementById('gameover-overlay');
-    if (over) { over.style.display = 'flex'; void over.offsetWidth; over.style.opacity = '1'; }
-}
-
-function _generateVictorySparkles(container) {
-    const count = 14 + Math.floor(Math.random() * 8);
-    for (let i = 0; i < count; i++) {
-        const el       = document.createElement('div');
-        el.className   = 'victory-sparkle';
-        const size     = _rnd(0.3, 0.9);
-        const startTop = _rnd(60, 95);
-        const left     = _rnd(5, 95);
-        const dur      = _rnd(2.5, 4.5);
-
-        el.style.cssText = `
-            position:absolute; left:${left.toFixed(1)}vw; top:${startTop.toFixed(1)}vh;
-            width:${size.toFixed(2)}vw; height:${size.toFixed(2)}vw; border-radius:50%;
-            background:radial-gradient(circle,#fff8dc 0%,#ffd700 60%,transparent 100%);
-            box-shadow:0 0 6px 2px rgba(255,215,0,0.8); opacity:0;
-            transition:top ${dur.toFixed(1)}s ease-out,opacity ${dur.toFixed(1)}s ease-out;
-        `;
-        container.appendChild(el);
-
-        setTimeout(() => {
-            el.style.opacity = _rnd(0.7, 1).toFixed(2);
-            el.style.top     = `${_rnd(-10, 20).toFixed(1)}vh`;
-        }, _rnd(0, 400));
-    }
-}
-
-function _rnd(min, max) { return min + Math.random() * (max - min); }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 7. RENDER LOOP
+// 6. RENDER LOOP
 // ─────────────────────────────────────────────────────────────────────────────
 const clock = new THREE.Clock();
 
@@ -323,7 +200,7 @@ function animate() {
             const isMoving = player.controls.isLocked
                 && distanza <= farEdge
                 && distanza > nearEdge;
-            monster.update(deltaTime, isMoving);
+            monsterAnimator.update(deltaTime, isMoving);
         }
     }
 
@@ -334,7 +211,7 @@ function animate() {
 animate();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 8. MISC WIRING
+// 7. MISC WIRING
 // ─────────────────────────────────────────────────────────────────────────────
 
 window.addEventListener('resize', () => {
@@ -342,31 +219,3 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
-// Click inside instructions panel → lock pointer
-document.getElementById('instructions').addEventListener('click', (e) => {
-    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
-    if (e.target.closest('.settings')) return;
-    if (player) player.controls.lock();
-});
-
-// Volume sliders (pause menu)
-const musicSlider = document.getElementById('music-volume');
-const sfxSlider   = document.getElementById('sfx-volume');
-const musicVal    = document.getElementById('music-vol-val');
-const sfxVal      = document.getElementById('sfx-vol-val');
-
-if (musicSlider) {
-    musicSlider.addEventListener('input', (e) => {
-        const val = e.target.value;
-        if (musicVal) musicVal.innerText = val + '%';
-        AudioSystem.setMusicVolume(val / 100);
-    });
-}
-if (sfxSlider) {
-    sfxSlider.addEventListener('input', (e) => {
-        const val = e.target.value;
-        if (sfxVal) sfxVal.innerText = val + '%';
-        AudioSystem.setSfxVolume(val / 100);
-    });
-}
