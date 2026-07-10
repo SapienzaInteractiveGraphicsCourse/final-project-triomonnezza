@@ -64,57 +64,11 @@ export class MapEasy extends MapBase {
         build(8, 4, 1, 2, ['N_0', 'S_0']);               // H6  B ↔ E
 
         // ═══════════════════════════════════════════════════════
-        // ROOM A - BEDROOM
-        // Room A bounds x[-2,14] z[-2,10]
-        // Doors: E_1 (east wall, row 1 → z≈6), S_1 (south wall, col 1 → x≈10)
-        // Doorless walls: North (z=-2), West (x=-2)
-        // ═══════════════════════════════════════════════════════
-        // North wall middle (x=6)
-        this.spawnProp('table.glb',         new THREE.Vector3( 6, 0, -1));
-        this.spawnProp('chair.glb',         new THREE.Vector3( 6, 0,  1.5), Math.PI);
-        // West wall middle (z=4)
-        this.spawnProp('couchSmall.glb',    new THREE.Vector3(-1.5, 0, 4), Math.PI / 2);
-
-        // ═══════════════════════════════════════════════════════
-        // ROOM B - KITCHEN / DINING ROOM
-        // Room B bounds x[22,38] z[-2,14]
-        // Doors: W_1 (west wall row 1 → z≈6), S_0 (south col 0 → x≈26), S_2 (south col 2 → x≈34)
-        // Doorless walls: North (z=-2), East (x=38)
-        // ═══════════════════════════════════════════════════════
-        // North wall middle (x=30)
-        this.spawnProp('table2.glb',        new THREE.Vector3(30, 0, -1));
-        this.spawnProp('chair2.glb',        new THREE.Vector3(30, 0,  1.5), Math.PI);
-        // East wall middle (z=6)
-        this.spawnProp('couchBig.glb',      new THREE.Vector3(36.5, 0, 6), -Math.PI / 2);
-
-        // ═══════════════════════════════════════════════════════
         // ROOM C - LIVING ROOM
         // Room C bounds x[14,26] z[18,30]
         // Doors: N_2, W_1, E_2, S_1. ALL WALLS HAVE DOORS.
         // Rule: Leave empty.
         // ═══════════════════════════════════════════════════════
-
-        // ═══════════════════════════════════════════════════════
-        // ROOM D - BATHROOM (now just room)
-        // Room D bounds x[-2,10] z[22,34]
-        // Doors: N_1 (north col 1 → x≈6), E_0 (east row 0 → z≈26)
-        // Doorless walls: South (z=34), West (x=-2)
-        // ═══════════════════════════════════════════════════════
-        // South wall middle (x=4)
-        this.spawnProp('couchSmall.glb',    new THREE.Vector3( 4, 0, 32.5), Math.PI);
-        // West wall middle (z=28)
-        this.spawnProp('plant.glb',         new THREE.Vector3(-1, 0, 28));
-
-        // ═══════════════════════════════════════════════════════
-        // ROOM E - STUDY / EXIT ROOM
-        // Room E bounds x[30,38] z[22,34]
-        // Doors: W_1 (west row 1 → z≈28), N_0 (north col 0 → x≈34)
-        // Doorless walls: South (z=34), East (x=38)
-        // ═══════════════════════════════════════════════════════
-        // South wall middle (x=34)
-        this.spawnProp('couchBig.glb',      new THREE.Vector3(34, 0, 32.5), Math.PI);
-        // East wall middle (z=28)
-        this.spawnProp('plant2.glb',        new THREE.Vector3(37, 0, 28));
 
         // ── Trigger horror (Regista) ──────────────────────────────────
         // Room D (Storage/Hallway closet), cx=4 cz=28 — jumpscare al primo ingresso

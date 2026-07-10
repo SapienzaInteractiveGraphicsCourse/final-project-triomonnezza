@@ -115,7 +115,7 @@ document.addEventListener('startGameEvent', async (e) => {
         flashCtrl.setPlayer(player);
         uiController.player = player;
 
-        monsterAI = new MonsterAI(mostroMesh, camera, currentMap.getMonsterCollisionBoxes(), currentMap.getDoors());
+        monsterAI = new MonsterAI(mostroMesh, camera, currentMap.getMonsterCollisionBoxes(), currentMap.getDoors(), currentMap.bigRooms);
 
         document.dispatchEvent(new Event('assetsLoadedEvent'));
 

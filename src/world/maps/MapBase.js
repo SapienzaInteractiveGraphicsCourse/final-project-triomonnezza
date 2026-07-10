@@ -26,6 +26,8 @@ export class MapBase {
         this._spawnedDoorKeys = new Set();
         // World-space XZ positions of goal doors — hinged doors are NOT placed here.
         this._goalDoorPositions = [];
+        // Tracks the centers and sizes of all large rooms for AI routing (e.g. teleporting)
+        this.bigRooms = [];
     }
 
     getMeshFromManager(filename) {
@@ -926,6 +928,9 @@ export class MapBase {
         const tileSize = 4;
         const cx = tx * 4 + cols * 2 - 2;
         const cz = tz * 4 + rows * 2 - 2;
+
+        // Register this big room for the AI
+        this.bigRooms.push({ cx, cz, cols, rows });
         const northZ = tz * 4 - 2;
         const southZ = (tz + rows) * 4 - 2;
         const westX = tx * 4 - 2;

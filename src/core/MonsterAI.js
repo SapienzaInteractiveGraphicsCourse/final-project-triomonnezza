@@ -15,11 +15,12 @@ export class MonsterAI {
      * @param {Array} monsterCollisionObjects - Array of Box3 for walls/doors (no furniture)
      * @param {Array} doors - Array of interactive door meshes (so the monster can open them)
      */
-    constructor(mostroMesh, camera, monsterCollisionObjects, doors) {
+    constructor(mostroMesh, camera, monsterCollisionObjects, doors, bigRooms = []) {
         this.mesh = mostroMesh;
         this.camera = camera;
         this.monsterCollisionObjects = monsterCollisionObjects || [];
         this.doors = doors || [];
+        this.bigRooms = bigRooms || [];
 
         // 5. Parametri di Stato dell'Inseguitore (AI del Mostro)
         this.speed = 4.2;            // Velocità lineare del mostro
@@ -46,9 +47,10 @@ export class MonsterAI {
     /**
      * Set the AI's collision objects (usually updated when a map loads)
      */
-    setEnvironment(monsterCollisionObjects, doors) {
+    setEnvironment(monsterCollisionObjects, doors, bigRooms = []) {
         this.monsterCollisionObjects = monsterCollisionObjects;
         this.doors = doors;
+        this.bigRooms = bigRooms || [];
         if (this.mesh) {
             this._aiState.lastPos.copy(this.mesh.position);
         }
@@ -115,6 +117,46 @@ export class MonsterAI {
         if (!this.mesh || !this.camera) return;
 
         const player = this.camera.position;
+
+        // 1. Try to teleport safely into the middle of an adjacent big room
+        if (this.bigRooms && this.bigRooms.length > 0) {
+            const validRooms = [];
+            for (const room of this.bigRooms) {
+                const dx = room.cx - player.x;
+                const dz = room.cz - player.z;
+                const dist = Math.sqrt(dx * dx + dz * dz);
+                
+                // We want an adjacent room: further than minRadius, but not too far
+                if (dist > minRadius && dist <= Math.max(maxRadius * 2.5, 30)) {
+                    validRooms.push(room);
+                }
+            }
+
+            if (validRooms.length > 0) {
+                const targetRoom = validRooms[Math.floor(Math.random() * validRooms.length)];
+                this.mesh.position.set(targetRoom.cx, this.mesh.position.y, targetRoom.cz);
+                return;
+            } else {
+                // Fallback: pick the closest room that is safely away from the player
+                let bestRoom = null;
+                let bestDist = Infinity;
+                for (const room of this.bigRooms) {
+                    const dx = room.cx - player.x;
+                    const dz = room.cz - player.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    if (dist > minRadius && dist < bestDist) {
+                        bestDist = dist;
+                        bestRoom = room;
+                    }
+                }
+                if (bestRoom) {
+                    this.mesh.position.set(bestRoom.cx, this.mesh.position.y, bestRoom.cz);
+                    return;
+                }
+            }
+        }
+
+        // 2. Fallback to older geometric logic if no big rooms exist
         const radius = minRadius + Math.random() * (maxRadius - minRadius);
         const testSize = new THREE.Vector3(1.5, 2.8, 1.5); // stesso ingombro usato per lo steering
 
@@ -136,7 +178,7 @@ export class MonsterAI {
             }
         }
 
-        // Fallback: nessuna posizione libera trovata, piazzalo comunque vicino
+        // Extrema ratio: place nearby anyway
         const angle = Math.random() * Math.PI * 2;
         this.mesh.position.set(
             player.x + Math.cos(angle) * radius,
