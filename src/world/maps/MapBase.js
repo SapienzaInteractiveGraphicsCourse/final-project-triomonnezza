@@ -920,6 +920,45 @@ export class MapBase {
         }
     }
 
+    autoPopulateBigRoom(tx, tz, cols, rows, doors, allowedAssets) {
+        if (!allowedAssets || allowedAssets.length === 0) return;
+
+        const cx = tx * 4 + cols * 2 - 2;
+        const cz = tz * 4 + rows * 2 - 2;
+        const northZ = tz * 4 - 2;
+        const southZ = (tz + rows) * 4 - 2;
+        const westX = tx * 4 - 2;
+        const eastX = (tx + cols) * 4 - 2;
+
+        const hasDoor = (prefix) => doors.some(d => d.startsWith(prefix));
+        const getRandomAsset = () => allowedAssets[Math.floor(Math.random() * allowedAssets.length)];
+
+        const spawnWithCompoundLogic = (asset, pos, rotY) => {
+            this.spawnProp(asset, pos, rotY);
+            if (asset === 'table.glb') {
+                const chairPos = pos.clone().add(new THREE.Vector3(0, 0, 2.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), rotY));
+                this.spawnProp('chair.glb', chairPos, rotY + Math.PI);
+            }
+            if (asset === 'table2.glb') {
+                const chairPos = pos.clone().add(new THREE.Vector3(0, 0, 2.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), rotY));
+                this.spawnProp('chair2.glb', chairPos, rotY + Math.PI);
+            }
+        };
+
+        if (!hasDoor('N')) {
+            spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(cx, 0, northZ + 1), 0);
+        }
+        if (!hasDoor('S')) {
+            spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(cx, 0, southZ - 1.5), Math.PI);
+        }
+        if (!hasDoor('W')) {
+            spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(westX + 1.5, 0, cz), Math.PI / 2);
+        }
+        if (!hasDoor('E')) {
+            spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(eastX - 1.5, 0, cz), -Math.PI / 2);
+        }
+    }
+
     async load() {
         await InteriorAssetManager.preloadAll();
     }
