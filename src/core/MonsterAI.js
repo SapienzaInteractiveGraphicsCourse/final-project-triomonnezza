@@ -41,7 +41,8 @@ export class MonsterAI {
             stuckCheckTimer: 0,      // accumula deltaTime per check periodico
             hasEverSeenPlayer: false, // true se ha mai visto il giocatore
             dynamicTeleportTimer: 0, // timer per il teletrasporto passivo
-            blockedVisuallyTimer: 0, // timer di blocco visivo dietro ostacoli
+            radiusStuckTimer: 0,     // timer per blocco in un raggio ristretto
+            radiusStuckCenter: mostroMesh ? mostroMesh.position.clone() : new THREE.Vector3(),
         };
     }
 
@@ -118,18 +119,38 @@ export class MonsterAI {
         if (!this.mesh || !this.camera) return;
 
         const player = this.camera.position;
+        const isPointInRoom = (px, pz, r) => {
+            const width = r.cols * 4;
+            const depth = r.rows * 4;
+            return Math.abs(px - r.cx) <= width / 2 && Math.abs(pz - r.cz) <= depth / 2;
+        };
 
         // 1. Try to teleport safely into the middle of an adjacent big room
         if (this.bigRooms && this.bigRooms.length > 0) {
             const validRooms = [];
+            let bestRoom = null;
+            let bestDist = Infinity;
+            let furthestRoom = null;
+            let maxDist = -1;
+
             for (const room of this.bigRooms) {
+                // Non teletrasportare mai nella stessa stanza in cui si trova il giocatore!
+                if (isPointInRoom(player.x, player.z, room)) continue;
+
                 const dx = room.cx - player.x;
                 const dz = room.cz - player.z;
                 const dist = Math.sqrt(dx * dx + dz * dz);
                 
-                // We want an adjacent room: further than minRadius, but not too far
                 if (dist > minRadius && dist <= Math.max(maxRadius * 2.5, 30)) {
                     validRooms.push(room);
+                }
+                if (dist > minRadius && dist < bestDist) {
+                    bestDist = dist;
+                    bestRoom = room;
+                }
+                if (dist > maxDist) {
+                    maxDist = dist;
+                    furthestRoom = room;
                 }
             }
 
@@ -137,29 +158,44 @@ export class MonsterAI {
                 const targetRoom = validRooms[Math.floor(Math.random() * validRooms.length)];
                 this.mesh.position.set(targetRoom.cx, this.mesh.position.y, targetRoom.cz);
                 return;
-            } else {
-                // Fallback: pick the closest room that is safely away from the player
-                let bestRoom = null;
-                let bestDist = Infinity;
-                for (const room of this.bigRooms) {
-                    const dx = room.cx - player.x;
-                    const dz = room.cz - player.z;
-                    const dist = Math.sqrt(dx * dx + dz * dz);
-                    if (dist > minRadius && dist < bestDist) {
-                        bestDist = dist;
-                        bestRoom = room;
-                    }
-                }
-                if (bestRoom) {
-                    this.mesh.position.set(bestRoom.cx, this.mesh.position.y, bestRoom.cz);
-                    return;
-                }
+            } else if (bestRoom) {
+                this.mesh.position.set(bestRoom.cx, this.mesh.position.y, bestRoom.cz);
+                return;
+            } else if (furthestRoom) {
+                this.mesh.position.set(furthestRoom.cx, this.mesh.position.y, furthestRoom.cz);
+                return;
             }
         }
 
-        // 2. Fallback to older geometric logic if no big rooms exist
+        // 2. Fallback sulle porte se mancano stanze valide
+        if (this.doors && this.doors.length > 0) {
+            const validDoors = [];
+            let bestDoor = null;
+            let bestDist = Infinity;
+            let furthestDoor = null;
+            let maxDist = -1;
+
+            for (const door of this.doors) {
+                const pos = door.position;
+                const dx = pos.x - player.x;
+                const dz = pos.z - player.z;
+                const dist = Math.sqrt(dx * dx + dz * dz);
+
+                if (dist > minRadius && dist <= maxRadius * 2.5) validDoors.push(door);
+                if (dist > minRadius && dist < bestDist) { bestDist = dist; bestDoor = door; }
+                if (dist > maxDist) { maxDist = dist; furthestDoor = door; }
+            }
+
+            const targetDoor = validDoors.length > 0 ? validDoors[Math.floor(Math.random() * validDoors.length)] : (bestDoor || furthestDoor);
+            if (targetDoor) {
+                this.mesh.position.set(targetDoor.position.x, this.mesh.position.y, targetDoor.position.z);
+                return;
+            }
+        }
+
+        // 3. Fallback geometrico di emergenza
         const radius = minRadius + Math.random() * (maxRadius - minRadius);
-        const testSize = new THREE.Vector3(1.5, 2.8, 1.5); // stesso ingombro usato per lo steering
+        const testSize = new THREE.Vector3(1.5, 2.8, 1.5);
 
         for (let attempt = 0; attempt < 8; attempt++) {
             const angle = Math.random() * Math.PI * 2;
@@ -179,7 +215,6 @@ export class MonsterAI {
             }
         }
 
-        // Extrema ratio: place nearby anyway
         const angle = Math.random() * Math.PI * 2;
         this.mesh.position.set(
             player.x + Math.cos(angle) * radius,
@@ -210,14 +245,18 @@ export class MonsterAI {
         }
 
         // ── Inseguimento Passivo (Teletrasporto Dinamico) ─────────────────────
-        if (!ai.hasEverSeenPlayer) {
+        // Si attiva SEMPRE se il mostro è fuori dall'aggroRadius (anche dopo averci visto)
+        if (distanzaEuclidea > this.aggroRadius) {
             ai.dynamicTeleportTimer += deltaTime;
-            if (ai.dynamicTeleportTimer >= 5.0) {
+            if (ai.dynamicTeleportTimer >= 6.0) {
                 ai.dynamicTeleportTimer = 0;
-                // Teletrasporta il mostro in una "stanza adiacente" (12-20 unità)
                 this._teleportMonsterNearPlayer(12, 20);
                 ai.lastPos.copy(this.mesh.position);
+                if (ai.radiusStuckCenter) ai.radiusStuckCenter.copy(this.mesh.position);
             }
+            return; // Se è lontano, gestiamo solo il passivo e ci fermiamo qui
+        } else {
+            ai.dynamicTeleportTimer = 0;
         }
 
         // ── Sequenza di attacco (Regista) ─────────────────────────────────────
@@ -251,29 +290,34 @@ export class MonsterAI {
             return; // durante l'attacco il mostro resta fermo, niente steering
         }
 
-        // ── Condizione di Inseguimento ────────────────────────────────────────
-        if (distanzaEuclidea > this.aggroRadius) {
-            ai.blockedVisuallyTimer = 0;
-            return;
-        }
+        // ── Controllo Blocco Globale (Fermo nello stesso raggio per 6 secondi) ─
+        if (!ai.radiusStuckCenter) ai.radiusStuckCenter = this.mesh.position.clone();
 
-        // ── Controllo Blocco Visivo (Ostacoli tra Mostro e Giocatore) ─────────
-        if (!this._hasLineOfSightToPlayer()) {
-            ai.blockedVisuallyTimer += deltaTime;
-            if (ai.blockedVisuallyTimer >= 6.0) {
-                ai.blockedVisuallyTimer = 0;
-                // Forza il teletrasporto nella stanza adiacente
-                this._teleportMonsterNearPlayer(12, 20);
-                ai.lastPos.copy(this.mesh.position);
-                
-                // Resetta anche gli altri timer di blocco per evitare conflitti
-                ai.stuckTimer = 0;
-                ai.escapeDir = null;
-                ai.escapeClock = 0;
-                return;
-            }
+        const hasLOS = this._hasLineOfSightToPlayer();
+
+        // Se è nella linea di vista, NON si teletrasporta MAI via timer (insegue sempre)
+        if (hasLOS) {
+            ai.radiusStuckTimer = 0;
+            ai.radiusStuckCenter.copy(this.mesh.position);
         } else {
-            ai.blockedVisuallyTimer = 0;
+            ai.radiusStuckTimer += deltaTime;
+            if (ai.radiusStuckTimer >= 6.0) {
+                const distFromCenter = this.mesh.position.distanceTo(ai.radiusStuckCenter);
+                if (distFromCenter < 3.5) {
+                    ai.radiusStuckTimer = 0;
+                    this._teleportMonsterNearPlayer(12, 20);
+                    
+                    ai.lastPos.copy(this.mesh.position);
+                    ai.radiusStuckCenter.copy(this.mesh.position);
+                    ai.stuckTimer = 0;
+                    ai.escapeDir = null;
+                    ai.escapeClock = 0;
+                    return;
+                }
+                // Aggiorna il centro per i prossimi 6 secondi
+                ai.radiusStuckCenter.copy(this.mesh.position);
+                ai.radiusStuckTimer = 0;
+            }
         }
 
         this.mesh.lookAt(this.camera.position.x, this.mesh.position.y, this.camera.position.z);
