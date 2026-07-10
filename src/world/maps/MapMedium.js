@@ -34,7 +34,7 @@ export class MapMedium extends MapBase {
         // ── Goal door MUST be registered BEFORE build() calls ──────────────────
         // so that _goalDoorPositions is populated before hinged doors are spawned.
         this.spawnGoalDoor(-2 + 0.15, 6, Math.PI / 2);
-        const allowedAssets = ['cabinet.glb', 'bookshelf.glb', 'table2.glb', 'trashBin.glb', 'painting2.glb'];
+        const allowedAssets = ['cabinet.glb', 'trashBin.glb', 'box.glb', 'box2.glb', 'trashBag.glb', 'radiator.glb', 'fridge.glb'];
 
         const build = (tx, tz, cols, rows, doors, flickers = false, lampColor = 0xfff4cc, isBigRoom = false) => {
             this.buildRoomByTiles(tx, tz, cols, rows, doors, TM);

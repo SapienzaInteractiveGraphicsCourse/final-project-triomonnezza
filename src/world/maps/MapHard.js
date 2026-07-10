@@ -55,7 +55,7 @@ export class MapHard extends MapBase {
         // so that _goalDoorPositions is populated before hinged doors are spawned.
         this.spawnGoalDoor(-2 + 0.15, 4, Math.PI / 2);
 
-        const allowedAssets = ['box.glb', 'box2.glb', 'ladder.glb', 'shelves.glb', 'cabinetLow.glb'];
+        const allowedAssets = ['box.glb', 'box2.glb', 'ladder.glb', 'shelves.glb', 'bucket.glb', 'broom.glb', 'breakerBox.glb', 'trashBag.glb'];
 
         const build = (tx, tz, cols, rows, doors, flickers = false, lampColor = 0xff8844, isBigRoom = false) => {
             this.buildRoomByTiles(tx, tz, cols, rows, doors, BK);

@@ -923,6 +923,7 @@ export class MapBase {
     autoPopulateBigRoom(tx, tz, cols, rows, doors, allowedAssets) {
         if (!allowedAssets || allowedAssets.length === 0) return;
 
+        const tileSize = 4;
         const cx = tx * 4 + cols * 2 - 2;
         const cz = tz * 4 + rows * 2 - 2;
         const northZ = tz * 4 - 2;
@@ -930,7 +931,42 @@ export class MapBase {
         const westX = tx * 4 - 2;
         const eastX = (tx + cols) * 4 - 2;
 
-        const hasDoor = (prefix) => doors.some(d => d.startsWith(prefix));
+        const startX = tx * 4;
+        const startZ = tz * 4;
+
+        const occupiedN = new Set();
+        const occupiedS = new Set();
+        const occupiedW = new Set();
+        const occupiedE = new Set();
+
+        doors.forEach(d => {
+            const [wall, idx] = d.split('_');
+            const i = parseInt(idx);
+            if (wall === 'N') occupiedN.add(i);
+            if (wall === 'S') occupiedS.add(i);
+            if (wall === 'W') occupiedW.add(i);
+            if (wall === 'E') occupiedE.add(i);
+        });
+
+        for (const gd of this._goalDoorPositions) {
+            if (Math.abs(gd.z - northZ) < 0.5) {
+                const c = Math.round((gd.x - startX) / tileSize);
+                if (c >= 0 && c < cols) occupiedN.add(c);
+            }
+            if (Math.abs(gd.z - southZ) < 0.5) {
+                const c = Math.round((gd.x - startX) / tileSize);
+                if (c >= 0 && c < cols) occupiedS.add(c);
+            }
+            if (Math.abs(gd.x - westX) < 0.5) {
+                const r = Math.round((gd.z - startZ) / tileSize);
+                if (r >= 0 && r < rows) occupiedW.add(r);
+            }
+            if (Math.abs(gd.x - eastX) < 0.5) {
+                const r = Math.round((gd.z - startZ) / tileSize);
+                if (r >= 0 && r < rows) occupiedE.add(r);
+            }
+        }
+
         const getRandomAsset = () => allowedAssets[Math.floor(Math.random() * allowedAssets.length)];
 
         const spawnWithCompoundLogic = (asset, pos, rotY) => {
@@ -945,17 +981,32 @@ export class MapBase {
             }
         };
 
-        if (!hasDoor('N')) {
-            spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(cx, 0, northZ + 1), 0);
+        const nwCornerAvailable = !occupiedN.has(0) && !occupiedW.has(0);
+        const neCornerAvailable = !occupiedN.has(cols-1) && !occupiedE.has(0);
+        const swCornerAvailable = !occupiedS.has(0) && !occupiedW.has(rows-1);
+        const seCornerAvailable = !occupiedS.has(cols-1) && !occupiedE.has(rows-1);
+
+        if (nwCornerAvailable) spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(westX + 1.5, 0, northZ + 1), 0);
+        if (neCornerAvailable) spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(eastX - 1.5, 0, northZ + 1), 0);
+        if (swCornerAvailable) spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(westX + 1.5, 0, southZ - 1.5), Math.PI);
+        if (seCornerAvailable) spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(eastX - 1.5, 0, southZ - 1.5), Math.PI);
+
+        for (let c = 1; c < cols - 1; c++) {
+            if (!occupiedN.has(c)) {
+                spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(startX + c * 4, 0, northZ + 1), 0);
+            }
+            if (!occupiedS.has(c)) {
+                spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(startX + c * 4, 0, southZ - 1.5), Math.PI);
+            }
         }
-        if (!hasDoor('S')) {
-            spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(cx, 0, southZ - 1.5), Math.PI);
-        }
-        if (!hasDoor('W')) {
-            spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(westX + 1.5, 0, cz), Math.PI / 2);
-        }
-        if (!hasDoor('E')) {
-            spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(eastX - 1.5, 0, cz), -Math.PI / 2);
+
+        for (let r = 1; r < rows - 1; r++) {
+            if (!occupiedW.has(r)) {
+                spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(westX + 1.5, 0, startZ + r * 4), Math.PI / 2);
+            }
+            if (!occupiedE.has(r)) {
+                spawnWithCompoundLogic(getRandomAsset(), new THREE.Vector3(eastX - 1.5, 0, startZ + r * 4), -Math.PI / 2);
+            }
         }
     }
 

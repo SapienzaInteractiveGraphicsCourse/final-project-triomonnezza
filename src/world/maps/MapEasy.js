@@ -37,18 +37,23 @@ export class MapEasy extends MapBase {
         // so that _goalDoorPositions is populated before hinged doors are spawned.
         this.spawnGoalDoor(20, 30 - 0.15, Math.PI);
 
-        const build = (tx, tz, cols, rows, doors, flickers = false, lampColor = 0xffeedd) => {
+        const easyAllowedAssets = ['couchBig.glb', 'couchSmall.glb', 'couchSmall2.glb', 'plant.glb', 'plant2.glb', 'bookshelf.glb'];
+
+        const build = (tx, tz, cols, rows, doors, flickers = false, lampColor = 0xffeedd, isBigRoom = false) => {
             this.buildRoomByTiles(tx, tz, cols, rows, doors, WP);
             const cx = tx * 4 + cols * 2 - 2;
             const cz = tz * 4 + rows * 2 - 2;
+            if (isBigRoom) {
+                this.autoPopulateBigRoom(tx, tz, cols, rows, doors, easyAllowedAssets);
+            }
         };
 
         // ── Rooms ──────────────────────────────────────────────────────
-        build(0, 0, 4, 3, ['E_1', 'S_1'], true);               // Room A  Bedroom
-        build(6, 0, 4, 4, ['W_1', 'S_0', 'S_2']);        // Room B  Kitchen
-        build(4, 5, 3, 3, ['N_2', 'W_1', 'E_2', 'S_1'], Math.random() > 0.5); // Room C  Living room
-        build(0, 6, 3, 3, ['N_1', 'E_0']);               // Room D  Storage
-        build(8, 6, 2, 3, ['W_1', 'N_0'], Math.random() > 0.5);               // Room E  Study/Exit
+        build(0, 0, 4, 3, ['E_1', 'S_1'], true, 0xffeedd, true);               // Room A  Bedroom
+        build(6, 0, 4, 4, ['W_1', 'S_0', 'S_2'], false, 0xffeedd, true);        // Room B  Kitchen
+        build(4, 5, 3, 3, ['N_2', 'W_1', 'E_2', 'S_1'], Math.random() > 0.5, 0xffeedd, true); // Room C  Living room
+        build(0, 6, 3, 3, ['N_1', 'E_0'], false, 0xffeedd, true);               // Room D  Storage
+        build(8, 6, 2, 3, ['W_1', 'N_0'], Math.random() > 0.5, 0xffeedd, true);               // Room E  Study/Exit
 
         // ── Connecting corridors ────────────────────────────────────────
         build(4, 1, 2, 1, ['W_0', 'E_0']);               // H1  A ↔ B
