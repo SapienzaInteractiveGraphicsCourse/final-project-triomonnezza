@@ -1,13 +1,6 @@
 /**
- * Monster.js  —  Entità Mostro (Modello Gerarchico)
- * RESPONSABILE: Alessandro (geometria base) + Federico (animazioni)
- *
- * Costruisce il mostro come modello gerarchico Three.js:
- *   Radice (corpo) → braccia, gambe, testa come child objects
- *
- * NOTA: Questo file si occupa SOLO della geometria. Le animazioni (Tween)
- * sono state spostate in src/animations/MonsterAnimator.js per separare
- * la vista dalla logica procedurale.
+ * Entità Mostro (Geometria Base)
+ * Costruisce il mostro come modello gerarchico.
  */
 
 import * as THREE from 'three';
@@ -18,15 +11,14 @@ export class Monster {
         this.root = new THREE.Group();
         this.root.name = 'Mostro';
 
-        // Raw monster height: feet bottom (~-1.5) to horn top (~+1.25) = ~2.75 units.
-        // Door height = 4.5m → scale = 4.5 / 2.75 ≈ 1.636  →  monster fills the doorway.
+        // Scala mostro per adattarlo alla porta (4.5m)
         this.root.scale.set(1.636, 1.636, 1.636);
 
         this._buildHierarchy();
     }
 
     _buildHierarchy() {
-        // Materiali per un look horror curato e inquietante
+        // Materiali horror
         const skinMaterial = new THREE.MeshPhongMaterial({ 
             color: 0x1f1f2e, 
             shininess: 40,
@@ -50,7 +42,7 @@ export class Monster {
         corpo.position.set(0, 0, 0);
         this.root.add(corpo);
 
-        // Gabbia toracica dettagliata (3 costole rosse sporgenti e luminose sul petto)
+        // Gabbia toracica (costole rosse)
         const ribGeom = new THREE.BoxGeometry(0.7, 0.08, 0.08);
         for (let i = 0; i < 3; i++) {
             const rib = new THREE.Mesh(ribGeom, glowMaterial);
@@ -64,10 +56,10 @@ export class Monster {
             skinMaterial
         );
         testa.name = 'testa';
-        testa.position.set(0, 0.9, 0); // Posizionata sopra il torso
+        testa.position.set(0, 0.9, 0);
         this.root.add(testa);
 
-        // Occhi rossi spaventosi
+        // Occhi rossi
         const eyeGeom = new THREE.SphereGeometry(0.06, 8, 8);
         const occhioSx = new THREE.Mesh(eyeGeom, glowMaterial);
         occhioSx.position.set(-0.18, 0.1, 0.31);
@@ -76,9 +68,9 @@ export class Monster {
         testa.add(occhioSx);
         testa.add(occhioDx);
 
-        // Corna creepy
+        // Corna
         const hornGeom = new THREE.ConeGeometry(0.06, 0.25, 4);
-        hornGeom.rotateX(-Math.PI / 6); // Inclina leggermente in avanti
+        hornGeom.rotateX(-Math.PI / 6);
         const cornoSx = new THREE.Mesh(hornGeom, accentMaterial);
         cornoSx.position.set(-0.2, 0.35, -0.05);
         const cornoDx = new THREE.Mesh(hornGeom, accentMaterial);
@@ -86,42 +78,42 @@ export class Monster {
         testa.add(cornoSx);
         testa.add(cornoDx);
 
-        // 3. BRACCIO SINISTRO (Articolato)
+        // 3. BRACCIO SINISTRO
         const braccioSx = new THREE.Group();
         braccioSx.name = 'braccio_sx';
         braccioSx.position.set(-0.6, 0.4, 0);
         this.root.add(braccioSx);
 
-        // Spalla / Parte superiore braccio
+        // Spalla
         const upperArmSxGeom = new THREE.BoxGeometry(0.2, 0.5, 0.2);
-        upperArmSxGeom.translate(0, -0.25, 0); // Sposta pivot alla spalla
+        upperArmSxGeom.translate(0, -0.25, 0);
         const upperArmSx = new THREE.Mesh(upperArmSxGeom, skinMaterial);
         braccioSx.add(upperArmSx);
 
         // Avanbraccio
         const forearmSxGeom = new THREE.BoxGeometry(0.16, 0.5, 0.16);
-        forearmSxGeom.translate(0, -0.25, 0); // Sposta pivot al gomito
+        forearmSxGeom.translate(0, -0.25, 0);
         const avanbraccioSx = new THREE.Mesh(forearmSxGeom, skinMaterial);
         avanbraccioSx.name = 'avanbraccio_sx';
-        avanbraccioSx.position.set(0, -0.5, 0); // Posizionato al gomito del braccio superiore
+        avanbraccioSx.position.set(0, -0.5, 0);
         braccioSx.add(avanbraccioSx);
 
         // Artigli mano sinistra
         const clawGeom = new THREE.ConeGeometry(0.04, 0.18, 4);
-        clawGeom.rotateX(Math.PI); // Punta verso il basso
+        clawGeom.rotateX(Math.PI);
         for (let i = 0; i < 3; i++) {
             const artiglio = new THREE.Mesh(clawGeom, accentMaterial);
             artiglio.position.set(-0.05 + i * 0.05, -0.5, 0.05);
             avanbraccioSx.add(artiglio);
         }
 
-        // 4. BRACCIO DESTRO (Articolato)
+        // 4. BRACCIO DESTRO
         const braccioDx = new THREE.Group();
         braccioDx.name = 'braccio_dx';
         braccioDx.position.set(0.6, 0.4, 0);
         this.root.add(braccioDx);
 
-        // Spalla / Parte superiore braccio
+        // Spalla
         const upperArmDxGeom = new THREE.BoxGeometry(0.2, 0.5, 0.2);
         upperArmDxGeom.translate(0, -0.25, 0);
         const upperArmDx = new THREE.Mesh(upperArmDxGeom, skinMaterial);
@@ -142,7 +134,7 @@ export class Monster {
             avanbraccioDx.add(artiglio);
         }
 
-        // 5. GAMBA SINISTRA (con giunto ginocchio articolato)
+        // 5. GAMBA SINISTRA
         const gambaSx = new THREE.Group();
         gambaSx.name = 'gamba_sx';
         gambaSx.position.set(-0.3, -0.6, 0);
@@ -201,7 +193,7 @@ export class Monster {
         footDx.position.set(0, -0.45, 0.05);
         shinDx.add(footDx);
 
-        // Riferimenti pubblici per l'animatore (MonsterAnimator)
+        // Riferimenti per l'animatore
         this.corpo         = corpo;
         this.testa         = testa;
         this.braccioSx     = braccioSx;

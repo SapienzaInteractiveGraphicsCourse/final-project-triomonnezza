@@ -7,7 +7,7 @@
     --bone-dim: #777777;
     --gold: #ccaa00;
     --gold-glow: rgba(204, 170, 0, 0.5);
-    --stamina-full: rgba(0, 180, 0, 1); /* Green */
+    --stamina-full: rgba(0, 180, 0, 1);
     --stamina-empty: rgba(153, 0, 0, 1);
 }
 
@@ -32,10 +32,10 @@ canvas {
     display: block;
     width: 100%;
     height: 100%;
-    image-rendering: pixelated; /* PSX look for any scaled textures */
+    image-rendering: pixelated;
 }
 
-/* ── CRT / PSX Scanlines & Noise ── */
+/* Scanlines CRT */
 .noise-overlay {
     position: fixed;
     inset: 0;
@@ -48,7 +48,7 @@ canvas {
     mix-blend-mode: overlay;
 }
 
-/* ── Crosshair ── */
+/* Mirino */
 #crosshair {
     position: absolute;
     top: 50%;
@@ -68,7 +68,7 @@ canvas {
     border: 2px solid var(--void);
 }
 
-/* ── HUD Torcia (Regista) ── */
+/* HUD Torcia */
 #torch-battery-hud {
     position: absolute;
     bottom: 62px;
@@ -85,7 +85,7 @@ canvas {
     color: var(--crimson);
 }
 
-/* ── HUD Stamina (Blocky PSX style) ── */
+/* HUD Stamina */
 #stamina-container {
     position: absolute;
     bottom: 40px;
@@ -105,9 +105,9 @@ canvas {
     transition: width 0.1s steps(10), background-color 0.1s steps(2);
 }
 
-/* ── HUD Inventory (Key) ── */
+/* HUD Inventario */
 #key-hud {
-    display: none; /* Iniziamente nascosto */
+    display: none;
     position: absolute;
     bottom: 40px;
     right: 40px;
@@ -127,7 +127,7 @@ canvas {
     image-rendering: pixelated;
 }
 
-/* ── Interaction Prompt (PSX Style) ── */
+/* Testo Interazione */
 #interaction-prompt {
     position: absolute;
     top: calc(50% + 40px);
@@ -149,7 +149,7 @@ canvas {
     opacity: 1;
 }
 
-/* ── HUD Messages (Blocky) ── */
+/* Messaggi HUD */
 #hud-messages {
     position: absolute;
     bottom: 80px;
@@ -170,7 +170,7 @@ canvas {
     opacity: 1;
 }
 
-/* ── Overlays (Menu, Loading, Instructions) ── */
+/* Schermate Overlay */
 .overlay-screen {
     position: fixed;
     inset: 0;
@@ -198,22 +198,22 @@ canvas {
     transition: opacity 0.5s steps(10);
 }
 
-/* ── Macchia di sangue sugli occhi (Regista) — SVG con blob generati in JS ── */
+/* Sangue schermo */
 #blood-splatter-overlay {
     position: fixed;
     inset: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 9990; /* sopra il gioco, sotto la schermata di game over (9999) */
+    z-index: 9990;
     pointer-events: none;
     opacity: 0;
 }
 
-/* ── Sequenza di vittoria (Regista) — l'opposto della morte: luce che invade lo schermo ── */
+/* Luce vittoria */
 #light-burst-overlay {
     position: fixed;
     inset: 0;
-    z-index: 9990; /* sopra il gioco, sotto la schermata di vittoria (9999) */
+    z-index: 9990;
     pointer-events: none;
     opacity: 0;
     background: radial-gradient(circle at 50% 50%,
@@ -223,7 +223,7 @@ canvas {
         transparent 75%);
 }
 
-/* ── Main Menu Title ── */
+/* Titolo Menu */
 .title-container {
     margin-bottom: 40px;
 }
@@ -243,7 +243,7 @@ canvas {
     margin-top: 10px;
 }
 
-/* ── Menu Buttons (PSX Style) ── */
+/* Bottoni Menu */
 .menu-buttons {
     display: flex;
     flex-direction: column;
@@ -273,7 +273,7 @@ canvas {
     box-shadow: 0 0 0 #000;
 }
 
-/* ── Loading Screen ── */
+/* Schermata Caricamento */
 .pulse-text {
     color: var(--crimson);
     font-size: 3rem;
@@ -301,7 +301,7 @@ canvas {
     text-transform: uppercase;
 }
 
-/* ── Instructions Screen ── */
+/* Schermata Istruzioni */
 #instructions {
     display: none;
     z-index: 20;
@@ -311,7 +311,7 @@ canvas {
     margin-bottom: 10px;
 }
 #instructions .glitch-text {
-    font-size: 3rem; /* Scaled down further for pause menu */
+    font-size: 3rem;
 }
 #instructions .subtitle {
     font-size: 1.2rem;
@@ -350,7 +350,7 @@ canvas {
     text-transform: uppercase;
 }
 
-/* ── Keyframes ── */
+/* Animazioni */
 @keyframes slideInUp {
     from { transform: translateY(20px); }
     to { transform: translateY(0); }

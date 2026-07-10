@@ -5,19 +5,18 @@ class AudioSystemClass {
         this.listener = new THREE.AudioListener();
         this.audioLoader = new THREE.AudioLoader();
 
-        // Cache of decoded audio buffers
+        // Buffer decodificati
         this.buffers = {};
 
-        // Background music tracks
+        // Tracce BGM
         this.bgmDoom = null;
         this.bgmAmbience = null;
         this.currentBgm = null;
 
-        // Player loop sounds
+        // Loop audio giocatore
         this.mattressStepLoop = null;
 
-        // Pre-allocated reusable one-shot sounds (avoids creating new THREE.Audio
-        // on every call — the main cause of frame lag when picking up objects)
+        // Pool suoni one-shot pre-allocati per evitare lag
         this._oneShotPool = {};
 
         this.isLoaded = false;
@@ -26,9 +25,7 @@ class AudioSystemClass {
         this.sfxVolume = 1.0;
     }
 
-    /**
-     * Preload all audio assets actually used by the game.
-     */
+    /** Precarica audio necessari */
     async preloadAll() {
         if (this.isLoaded) return;
 
@@ -48,10 +45,10 @@ class AudioSystemClass {
             { name: 'demon_breathing',  path: 'assets/sounds/sfx/Creepy Events Sounds/demon breathing.wav' },
             { name: 'blood_splash',     path: 'assets/sounds/sfx/Creepy Events Sounds/blood splash 2.wav' },
 
-            // Footsteps
+            // Passi
             { name: 'mattress_steps', path: 'assets/sounds/sfx/footsteps/mattress steps.wav' },
 
-            // Soundtracks
+            // Colonne sonore
             { name: 'bgm_doom',     path: 'assets/sounds/Soundtracks/7. Awaiting Doom.wav' },
             { name: 'bgm_ambience', path: 'assets/sounds/Soundtracks/AMBIENCE 1.wav' },
         ];
@@ -109,11 +106,7 @@ class AudioSystemClass {
         this.mattressStepLoop.play();
     }
 
-    /**
-     * Pre-allocate a single THREE.Audio instance per one-shot sound.
-     * Reusing them eliminates the GC spike / frame lag caused by
-     * creating + garbage-collecting a new Web Audio graph node on every pickup.
-     */
+    /** Alloca un audio per i suoni one-shot per evitare stuttering */
     _setupOneShotPool() {
         const oneShotNames = ['pickup', 'blood_splash', 'strong_breathing',
                               'door_key', 'open_menu', 'close_menu'];
@@ -125,9 +118,7 @@ class AudioSystemClass {
         }
     }
 
-    /**
-     * Start the main ambient music.
-     */
+    /** Avvia musica ambientale */
     startBGM() {
         if (this.bgmDoom && !this.bgmDoom.isPlaying) this.bgmDoom.play();
         if (this.bgmAmbience && !this.bgmAmbience.isPlaying) this.bgmAmbience.play();
@@ -142,10 +133,7 @@ class AudioSystemClass {
         if (this.bgmAmbience && this.bgmAmbience.isPlaying) this.bgmAmbience.stop();
     }
 
-    /**
-     * Switch BGM dynamically.
-     * @param {string} state 'doom' or 'ambience'
-     */
+    /** Cambia BGM attivamente */
     setBGMState(state) {
         if (this.currentBgm === state) return;
         this.currentBgm = state;
@@ -173,14 +161,9 @@ class AudioSystemClass {
         }, stepTime);
     }
 
-    /**
-     * Play a pre-allocated one-shot 2D sound.
-     * Falls back to creating a new Audio only for sounds not in the pool.
-     * @param {string} name
-     * @param {number} volume
-     */
+    /** Riproduce un suono one-shot (usa pool se disponibile) */
     playSound(name, volume = 1.0) {
-        // Use the pre-allocated pool if available (lag-free)
+        // Usa pool pre-allocato per evitare lag
         const pooled = this._oneShotPool[name];
         if (pooled) {
             if (pooled.isPlaying) pooled.stop();
@@ -189,7 +172,7 @@ class AudioSystemClass {
             return pooled;
         }
 
-        // Fallback for any sound not in the pool
+        // Fallback per suoni non nel pool
         if (!this.buffers[name]) return null;
         const sound = new THREE.Audio(this.listener);
         sound.setBuffer(this.buffers[name]);
@@ -198,9 +181,7 @@ class AudioSystemClass {
         return sound;
     }
 
-    /**
-     * Helper to get a PositionalAudio object.
-     */
+    /** Ottieni oggetto PositionalAudio */
     getPositionalSound(name, refDistance = 5, volume = 1.0) {
         if (!this.buffers[name]) return null;
         const sound = new THREE.PositionalAudio(this.listener);
@@ -210,9 +191,7 @@ class AudioSystemClass {
         return sound;
     }
 
-    /**
-     * Play a 3D Positional Audio once at a specific world position.
-     */
+    /** Riproduce audio 3D posizionale in un punto */
     playPositionalSoundAt(name, scene, position, refDistance = 5, volume = 1.0) {
         if (!this.buffers[name] || !scene) return null;
 
@@ -231,9 +210,7 @@ class AudioSystemClass {
         return sound;
     }
 
-    /**
-     * Update player footsteps volume/speed.
-     */
+    /** Aggiorna volume/velocità passi giocatore */
     updatePlayerFootsteps(isMoving, isSprinting) {
         if (!this.mattressStepLoop) return;
         if (isMoving) {
@@ -252,7 +229,7 @@ class AudioSystemClass {
 
     setSfxVolume(vol) {
         this.sfxVolume = vol;
-        // Pooled sounds will pick up the new volume on next play()
+        // I suoni nel pool useranno il nuovo volume al prossimo play()
     }
 }
 

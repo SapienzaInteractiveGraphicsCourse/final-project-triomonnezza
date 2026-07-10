@@ -13,27 +13,26 @@ import { MonsterAI }             from './src/core/MonsterAI.js';
 import { GameUIController }      from './src/ui/GameUIController.js';
 import * as TWEEN from '@tweenjs/tween.js';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. THREE.js SCENE SETUP
-// ─────────────────────────────────────────────────────────────────────────────
+// 1. SETUP SCENA
+
 const scene    = new THREE.Scene();
 scene.background = new THREE.Color(0x111111);
 
 const camera   = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = false; // Horror game = dark by default; shadows from SpotLight only
+renderer.shadowMap.enabled = false; // Nessuna ombra globale, solo SpotLight
 document.body.appendChild(renderer.domElement);
 
-// Minimal ambient fill — real illumination comes from ceiling lamps
+// Luce ambientale minima
+
 scene.add(new THREE.AmbientLight(0x333344, 0.15));
 const dirLight = new THREE.DirectionalLight(0xffeedd, 0.05);
 dirLight.position.set(10, 20, 10);
 scene.add(dirLight);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 2. GLOBAL GAME STATE & CONTROLLERS
-// ─────────────────────────────────────────────────────────────────────────────
+// 2. STATO GLOBALE E CONTROLLERS
+
 let currentMap  = null;
 let player      = null;
 let mostroMesh  = null;
@@ -41,23 +40,26 @@ let monsterAI   = null;
 const monster   = new Monster();
 const monsterAnimator = new MonsterAnimator(monster, TWEEN);
 
-// Cosmetic tween manager (screen shake, item pickup fly-away, etc.)
+// Tween manager per animazioni cosmetiche
+
 const tweenManager = new TweenManager(TWEEN, { scene, canvas: renderer.domElement });
 
-// Flashlight controller — player is set after startGameEvent resolves
+// Controller torcia
+
 const flashCtrl = new FlashlightController({ player: null, camera, TWEEN });
 
-// Door controller — wired to scene/audio; fires global 'horrorTrigger' GOAL_REACHED event
+// Controller porte
+
 const doorCtrl = new DoorController(TWEEN, scene, AudioSystem, (_group) => {
     document.dispatchEvent(new CustomEvent('horrorTrigger', { detail: { eventName: 'GOAL_REACHED' } }));
 });
 
-// UI Controller - handles DOM overlays, menus, win/loss sequences
+// Controller UI
+
 const uiController = new GameUIController(null);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 3. DEBUG GODMODE (press G)
-// ─────────────────────────────────────────────────────────────────────────────
+// 3. DEBUG GODMODE (Tasto G)
+
 window.DEBUG_GODMODE = false;
 document.addEventListener('keydown', (e) => {
     if (e.code !== 'KeyG') return;
@@ -72,9 +74,8 @@ document.addEventListener('playerAttaccatoDebug', () => {
     document.dispatchEvent(new CustomEvent('horrorTrigger', { detail: { eventName: 'PLAYER_ATTACKED' } }));
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 4. GAME START (triggered by menu)
-// ─────────────────────────────────────────────────────────────────────────────
+// 4. AVVIO GIOCO
+
 document.addEventListener('startGameEvent', async (e) => {
     const difficulty = e.detail.difficulty;
     window.currentDifficulty = difficulty;
@@ -93,7 +94,8 @@ document.addEventListener('startGameEvent', async (e) => {
         const collisionBoxes = currentMap.getCollisionBoxes();
         const triggerZones   = currentMap.getTriggerZones();
 
-        // Spawn monster
+        // Spawn mostro
+
         mostroMesh = monster.getMesh();
         mostroMesh.position.copy(currentMap.getMonsterSpawn());
         mostroMesh.traverse((child) => {
@@ -102,7 +104,8 @@ document.addEventListener('startGameEvent', async (e) => {
         scene.add(mostroMesh);
         monster.initAudio();
 
-        // Position camera + create player
+        // Setup telecamera e giocatore
+
         camera.position.copy(currentMap.getPlayerSpawn());
         if (currentMap.getPlayerRotationY) {
             camera.rotation.set(0, currentMap.getPlayerRotationY(), 0);
@@ -125,11 +128,11 @@ document.addEventListener('startGameEvent', async (e) => {
     }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 5. GAME EVENTS
-// ─────────────────────────────────────────────────────────────────────────────
+// 5. EVENTI GIOCO
 
-// Pointer-lock UI sounds
+
+// Suoni menu pointer-lock
+
 document.addEventListener('pointerlockchange', () => {
     if (!player) return;
     const locked = document.pointerLockElement === document.body
@@ -137,7 +140,8 @@ document.addEventListener('pointerlockchange', () => {
     AudioSystem.playSound(locked ? 'close_menu' : 'open_menu');
 });
 
-// Item pickup sounds (UI logic is handled in GameUIController)
+// Suoni raccolta oggetti
+
 document.addEventListener('itemRaccolto', (e) => {
     const idChiave = e.detail.idChiave;
     AudioSystem.playSound('pickup');
@@ -150,7 +154,8 @@ document.addEventListener('itemRaccolto', (e) => {
     }
 });
 
-// Monster events
+// Eventi mostro
+
 document.addEventListener('mostroNotaGiocatore', () => {
     AudioSystem.playSound('strong_breathing');
     monsterAnimator.notice();
@@ -159,23 +164,24 @@ document.addEventListener('mostroAttacca', () => {
     monsterAnimator.attack();
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 // 6. RENDER LOOP
-// ─────────────────────────────────────────────────────────────────────────────
+
 const clock = new THREE.Clock();
 
 function animate() {
     requestAnimationFrame(animate);
     TWEEN.update();
 
-    // Clamp deltaTime: tab-switch / lag spikes would cause tunnelling through walls
+    // Limite deltaTime per evitare compenetrazioni
+
     const deltaTime = Math.min(clock.getDelta(), 0.1);
 
     if (player && mostroMesh) {
         player.update(deltaTime, mostroMesh);
 
         if (player.controls.isLocked) {
-            // Distance/fear shared by flashlight + BGM + monster AI
+            // Distanza mostro
+
             const toMonster = new THREE.Vector3()
                 .subVectors(camera.position, mostroMesh.position);
             toMonster.y = 0;
@@ -185,18 +191,22 @@ function animate() {
             const nearEdge   = player.mostroAttackRadius || 2.5;
             const fearFactor = 1 - Math.min(1, Math.max(0, (distanza - nearEdge) / (farEdge - nearEdge)));
 
-            // Flashlight: sway, drain, flicker, FOV (all in one call)
+            // Aggiorna torcia
+
             flashCtrl.update(deltaTime, fearFactor);
 
-            // BGM crossfade based on monster proximity
+            // Audio BGM dinamico
+
             AudioSystem.setBGMState(distanza <= farEdge ? 'ambience' : 'doom');
 
-            // Monster AI logic (movement, raycasting, doors, attack triggers)
+            // Logica AI mostro
+
             if (monsterAI) {
                 monsterAI.update(deltaTime);
             }
 
-            // Monster animation
+            // Animazione mostro
+
             const isMoving = player.controls.isLocked
                 && distanza <= farEdge
                 && distanza > nearEdge;
@@ -210,9 +220,8 @@ function animate() {
 }
 animate();
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 7. MISC WIRING
-// ─────────────────────────────────────────────────────────────────────────────
+// 7. EVENTI FINESTRA
+
 
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;

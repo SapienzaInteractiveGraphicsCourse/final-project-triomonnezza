@@ -8,47 +8,44 @@ export class PlayerController {
         this.camera = camera;
         this.domElement = domElement;
 
-        // Input esterni passati dall'Artista (Studente B)
-        this.collisionObjects = collisionObjects; // Array di THREE.Box3 (muri/ostacoli/arredamento) — usato dal giocatore
-        this.triggerZones = triggerZones;         // Array di oggetti { box: Box3, nome: string, giaAttivato: bool }
+        // Variabili collisione e trigger
+        this.collisionObjects = collisionObjects;
+        this.triggerZones = triggerZones;
 
-        // 1. Setup Controlli Cinematici (Pointer Lock)
+        // 1. Controlli Pointer Lock
         this.controls = new PointerLockControls(this.camera, this.domElement);
-        // Eye level: 2.5m — comfortably below the 4.5m doors
+        // Altezza occhi e limiti visuale
         this.camera.position.y = 2.5;
-        // Clamp vertical look: block looking straight down (hides missing legs)
-        // 0.3 rad ≈ 17° from straight up;  Math.PI*0.72 ≈ 40° max below horizon
         this.controls.minPolarAngle = 0.3;
         this.controls.maxPolarAngle = Math.PI * 0.72;
 
-        // 2. Vettori di Stato del Giocatore e Parametri di Movimento
+        // 2. Movimento
         this.velocity = new THREE.Vector3();
         this.direction = new THREE.Vector3();
-        this.baseMoveSpeed = 45.0;  // Velocità di camminata standard
-        this.sprintMoveSpeed = 85.0; // Velocità raddoppiata durante lo scatto
+        this.baseMoveSpeed = 45.0;
+        this.sprintMoveSpeed = 85.0;
         this.moveSpeed = this.baseMoveSpeed;
         this.friction = 10.0;
-        this.playerSize = new THREE.Vector3(1.5, 1.8, 1.5); // Collision box (centered at eye level)
+        this.playerSize = new THREE.Vector3(1.5, 1.8, 1.5);
 
-        // --- SISTEMA DI STAMINA ---
-        this.maxStamina = 4.0;       // Dura 4 secondi di corsa continua
+        // Stamina
+        this.maxStamina = 4.0;
         this.stamina = this.maxStamina;
-        this.staminaRegenRate = this.maxStamina / 2.0; // Si ricarica totalmente in 2 secondi (2.0 unità al secondo)
-        this.staminaDrainRate = 1.0; // Consuma 1 unità al secondo mentre corre
+        this.staminaRegenRate = this.maxStamina / 2.0;
+        this.staminaDrainRate = 1.0;
         this.isSprinting = false;
-        this.wasStaminaEmpty = false; // Flag per evitare loop audio
-        // ---------------------------
+        this.wasStaminaEmpty = false;
 
-        // 3. Stato di Gioco & Logica di Inventario
+        // 3. Inventario e Salute
         this.salute = 100;
-        this.inventario = new Set(); // Gestione matematica degli elementi unici raccolti
+        this.inventario = new Set();
 
-        // 4. Sensore Virtuale di Sguardo (Raycaster per Interazioni)
+        // 4. Raycaster Interazioni
         this.raycaster = new THREE.Raycaster();
         this.rayDistance = 4.5;
         this.interactiveObject = null;
 
-        // 5. Registro Input da tastiera
+        // 5. Input Tastiera
         this.keys = { forward: false, backward: false, left: false, right: false, space: false };
 
         this.flashState = 'OFF_START';
@@ -59,35 +56,35 @@ export class PlayerController {
     }
 
     _initFlashlight() {
-        // Luce a cono della torcia (Potenza calibrata per materiali PBR fisicamente corretti)
+        // Luce torcia
         this.flashlight = new THREE.SpotLight(0xffffff, 150.0);
-        this.flashlight.position.set(0.3, -0.3, -0.3); // In basso a destra
-        this.flashlight.angle = Math.PI / 4; // Fascio più largo
-        this.flashlight.penumbra = 0.5; // Sfumatura morbida
+        this.flashlight.position.set(0.3, -0.3, -0.3);
+        this.flashlight.angle = Math.PI / 4;
+        this.flashlight.penumbra = 0.5;
         this.flashlight.decay = 2.0;
-        this.flashlight.distance = 120; // Arriva molto più lontano
+        this.flashlight.distance = 120;
 
-        // Abilita le ombre per la torcia
+        // Ombre torcia
         this.flashlight.castShadow = true;
         this.flashlight.shadow.mapSize.width = 1024;
         this.flashlight.shadow.mapSize.height = 1024;
         this.flashlight.shadow.camera.near = 0.5;
         this.flashlight.shadow.camera.far = 120;
 
-        // Target della luce
-        this.flashlight.target.position.set(0.3, -0.3, -2); // Punta sempre dritto davanti alla torcia
+        // Target luce
+        this.flashlight.target.position.set(0.3, -0.3, -2);
 
-        // Attacca tutto alla telecamera in modo che segua lo sguardo del giocatore
+        // Attacca alla telecamera
         this.camera.add(this.flashlight);
         this.camera.add(this.flashlight.target);
 
-        // Caricamento del modello 3D
+        // Modello 3D
         const loader = new FBXLoader();
         const textureLoader = new THREE.TextureLoader();
         const texture = textureLoader.load('./assets/models/flashlight/texture.png');
         texture.colorSpace = THREE.SRGBColorSpace;
 
-        // Luce per illuminare la torcia (non serve più col BasicMaterial ma lo lasciamo)
+        // Luce di supporto torcia
         const weaponLight = new THREE.PointLight(0xffffff, 1.0, 3.0);
         weaponLight.position.set(0.2, 0, -0.2);
         this.camera.add(weaponLight);
@@ -96,8 +93,7 @@ export class PlayerController {
             object.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
-                    // Per il DEBUG usiamo un MeshBasicMaterial.
-                    // Questo ignora completamente le luci e mostra i colori puri della texture.
+                    // Debug materiale per colori puri
                     child.material = new THREE.MeshBasicMaterial({
                         map: texture,
                         color: 0xffffff
@@ -105,14 +101,13 @@ export class PlayerController {
                 }
             });
 
-            // Scaliamo il modello in modo molto più aggressivo
+            // Scala modello
             object.scale.set(0.0003, 0.0003, 0.0003);
 
-            // Posiziona il modello 3D in basso a destra
+            // Posizione modello
             object.position.set(0.3, -0.4, -0.5);
 
-            // Ruotiamo la torcia. Se punta di lato, la giriamo sull'asse Y.
-            // Azzero le altre rotazioni per evitare che punti in alto o in basso.
+            // Rotazione torcia
             object.rotation.set(0, -Math.PI / 2, 0);
 
             this.camera.add(object);
@@ -122,12 +117,12 @@ export class PlayerController {
         });
     }
 
-    // Inizializzazione dei sistemi di cattura degli input (Discreti e Continui)
+    // Listener input
     _initInputListeners() {
         document.addEventListener('keydown', (e) => this._onKeyDown(e));
         document.addEventListener('keyup', (e) => this._onKeyUp(e));
 
-        // Attivazione del PointerLock tramite click sulla viewport
+        // Click attiva PointerLock
         this.domElement.addEventListener('click', () => {
             if (!this.controls.isLocked) this.controls.lock();
         });
@@ -140,7 +135,7 @@ export class PlayerController {
             case 'KeyA': case 'ArrowLeft': this.keys.left = true; break;
             case 'KeyS': case 'ArrowDown': this.keys.backward = true; break;
             case 'KeyD': case 'ArrowRight': this.keys.right = true; break;
-            case 'Space': this.keys.space = true; break; // Barra Spaziatrice per correre
+            case 'Space': this.keys.space = true; break; // Scatto
             case 'KeyE': this._interact(); break;
         }
     }
@@ -156,11 +151,11 @@ export class PlayerController {
     }
 
 
-    // LOOP PRINCIPALE DI AGGIORNAMENTO DINAMICO (Da invocare nel requestAnimationFrame globale)
+    // LOOP PRINCIPALE
     update(deltaTime) {
         if (!this.controls.isLocked) return;
 
-        // --- GESTIONE TORCIA (Flickering) ---
+        // --- GESTIONE TORCIA ---
         this.flashTimer -= deltaTime;
         if (this.flashState === 'OFF_START') {
             this.flashlight.intensity = 0;
@@ -190,7 +185,7 @@ export class PlayerController {
             }
         }
 
-        // --- GESTIONE DEI VALORI DELLA STAMINA E VELOCITÀ ---
+        // --- STAMINA E VELOCITÀ ---
         const staMuovendo = this.keys.forward || this.keys.backward || this.keys.left || this.keys.right;
 
         if (this.keys.space && staMuovendo && this.stamina > 0 && !this.wasStaminaEmpty) {
@@ -207,9 +202,9 @@ export class PlayerController {
         } else {
             this.isSprinting = false;
             this.moveSpeed = this.baseMoveSpeed;
-            // Ricarica solo se non si sta scattando
+            // Ricarica solo se non in scatto
             if (this.stamina < this.maxStamina) {
-                this.stamina += this.staminaRegenRate * deltaTime; // Ricarica rapida (in 2 secondi)
+                this.stamina += this.staminaRegenRate * deltaTime;
                 if (this.stamina >= this.maxStamina) { // Reset flag when regenerated fully
                     this.wasStaminaEmpty = false;
                 }
@@ -217,36 +212,35 @@ export class PlayerController {
             }
         }
 
-        // Update footsteps audio
+        // Aggiorna audio passi
         AudioSystem.updatePlayerFootsteps(staMuovendo, this.isSprinting);
 
-        // Invia l'evento UI della percentuale di stamina rimasta (0-100)
+        // Evento UI percentuale stamina
         const percentualeStamina = (this.stamina / this.maxStamina) * 100;
         this._dispatchGlobalEvent('staminaChanged', { percentuale: percentualeStamina });
-        // -----------------------------------------------------
 
 
-        // 1. Modello di Attrito (Decelerazione esponenziale fittizia)
+        // 1. Attrito
         this.velocity.x -= this.velocity.x * this.friction * deltaTime;
         this.velocity.z -= this.velocity.z * this.friction * deltaTime;
 
-        // 2. Elaborazione Vettore Direzione
+        // 2. Direzione
         this.direction.z = Number(this.keys.forward) - Number(this.keys.backward);
         this.direction.x = Number(this.keys.right) - Number(this.keys.left);
-        this.direction.normalize(); // Normalizzazione del vettore per mantenere velocità isotropa nelle diagonali
+        this.direction.normalize();
 
-        // 3. Trasformazione Forze in Velocità Lineare Locale
+        // 3. Velocità lineare locale
         if (this.keys.forward || this.keys.backward) this.velocity.z -= this.direction.z * this.moveSpeed * deltaTime;
         if (this.keys.left || this.keys.right) this.velocity.x -= this.direction.x * this.moveSpeed * deltaTime;
 
-        // 4. Salvataggio Stato Precedente per Rollback per asse (sliding collision)
+        // 4. Salva posizione precedente
         const oldPosition = this.camera.position.clone();
 
-        // 5. Attuazione del movimento nello spazio locale della telecamera
+        // 5. Applica movimento
         this.controls.moveRight(-this.velocity.x * deltaTime);
         this.controls.moveForward(-this.velocity.z * deltaTime);
 
-        // 6. Risoluzione collisioni con scivolamento fluido (sliding wall collision)
+        // 6. Risoluzione collisioni (Sliding)
         const desiredPosition = this.camera.position.clone();
 
         if (this._checkCollisions(desiredPosition)) {
@@ -254,7 +248,7 @@ export class PlayerController {
             this.camera.position.lerpVectors(oldPosition, desiredPosition, directFraction);
 
             if (directFraction < 0.02) {
-                // Il percorso diretto è bloccato quasi subito
+                // Percorso diretto bloccato
                 const xOnly = new THREE.Vector3(desiredPosition.x, oldPosition.y, oldPosition.z);
                 const xFraction = this._findSafeFraction(oldPosition, xOnly);
                 const zOnly = new THREE.Vector3(oldPosition.x, oldPosition.y, desiredPosition.z);
@@ -274,15 +268,15 @@ export class PlayerController {
             }
         }
 
-        // Lock Y to eye-level to prevent vertical drift from numerical imprecision
+        // Blocca Y all'altezza degli occhi
         this.camera.position.y = oldPosition.y;
 
-        // 7. Esecuzione dei Sottosistemi Ausiliari
-        this._updateRaycast();                     // Aggiornamento Sensore Ottico Virtuale
-        this._checkTriggerZones();                 // Scansione Sensori di Presenza (Trigger)
+        // 7. Sottosistemi
+        this._updateRaycast();
+        this._checkTriggerZones();
     }
 
-    // Costruisce l'AABB del giocatore che copre dal pavimento alla testa.
+    // Costruisce AABB del giocatore
     _getPlayerBox(pos = this.camera.position) {
         const halfX = this.playerSize.x / 2;
         const halfZ = this.playerSize.z / 2;
@@ -294,7 +288,7 @@ export class PlayerController {
         );
     }
 
-    // Rilevamento Intersezioni Assiali Box-to-Box (AABB Collision System).
+    // Rilevamento collisioni AABB
     _checkCollisions(pos = this.camera.position) {
         const playerBox = this._getPlayerBox(pos);
 
@@ -306,11 +300,10 @@ export class PlayerController {
         return false;
     }
 
-    // Ricerca binaria della frazione massima (0..1) del segmento fromPos→toPos
-    // che è libera da collisioni.
+    // Ricerca binaria per frazione libera da collisioni
     _findSafeFraction(fromPos, toPos, iterations = 6) {
         if (!this._checkCollisions(toPos)) return 1;
-        if (this._checkCollisions(fromPos)) return 0; // già in collisione: non avanzare oltre
+        if (this._checkCollisions(fromPos)) return 0;
         let lo = 0, hi = 1;
         const testPos = new THREE.Vector3();
         for (let i = 0; i < iterations; i++) {
@@ -321,11 +314,10 @@ export class PlayerController {
         return lo;
     }
 
-    // Sensore Visivo: Proiezione del raggio centrale (Raycasting)
+    // Raycast per interazioni
     _updateRaycast() {
         this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
 
-        // L'Artista passerà le Mesh interattive reali.
         const intersects = this.raycaster.intersectObjects(this.camera.parent ? this.camera.parent.children : [], true);
 
         if (intersects.length > 0 && intersects[0].distance <= this.rayDistance) {
@@ -366,7 +358,7 @@ export class PlayerController {
         }
     }
 
-    // Scansione geometrica dei Sensori ad Area (Trigger di Spavento/Logica)
+    // Controlla zone trigger (spavento/logica)
     _checkTriggerZones() {
         if (!this.triggerZones) return;
 
@@ -375,33 +367,31 @@ export class PlayerController {
         for (let i = 0; i < this.triggerZones.length; i++) {
             const zone = this.triggerZones[i];
             if (playerBox.intersectsBox(zone.box) && !zone.giaAttivato) {
-                zone.giaAttivato = true; // Flag di Lock out per evitare attivazioni multiple asincrone
-
-                // Distribuzione dell'evento al Regista (Studente C) per i Tween cinematici
+                zone.giaAttivato = true;
+                
                 this._dispatchGlobalEvent('horrorTrigger', { eventName: zone.nome });
             }
         }
     }
 
-    // Attuatore Logico d'Interazione (Tasto E)
+    // Interagisce con oggetto puntato
     _interact() {
         if (!this.interactiveObject) return;
 
         const objData = this.interactiveObject.userData;
 
-        // Sotto-logica 1: Raccolta Oggetti (Chiavi/Item)
+        // Raccolta Oggetti
         if (objData.tipo === 'chiave') {
             this.inventario.add(objData.idChiave);
             console.log(`Inventario Aggiornato: Raccolta ${objData.idChiave}`);
 
-            // Passa il gruppo padre per rimuovere l'intero oggetto dalla scena
             const toRemove = this.interactiveObject.parent || this.interactiveObject;
             this._dispatchGlobalEvent('itemRaccolto', { object: toRemove, idChiave: objData.idChiave });
             this.interactiveObject = null;
             return;
         }
 
-        // Sotto-logica 2: Porta del Goal (richiede chiave dorata)
+        // Porta del Goal (richiede chiave dorata)
         if (objData.tipo === 'porta_goal') {
             if (!this.inventario.has('chiave_goal')) {
                 this._dispatchGlobalEvent('logMessaggioUI', { testo: 'The exit door is locked. Find the Golden Key!' });
@@ -412,19 +402,18 @@ export class PlayerController {
             return;
         }
 
-        // Sotto-logica 3: Controllo Accessi (Porte normali bloccate)
+        // Porte normali (possono richiedere chiave)
         if (objData.tipo === 'porta') {
             if (objData.richiedeChiave && !this.inventario.has(objData.idChiave)) {
                 this._dispatchGlobalEvent('logMessaggioUI', { testo: "The door is locked from the inside. You need a key." });
                 return;
             }
 
-            // Se sbloccata o libera, lancia l'evento di sblocco
             this._dispatchGlobalEvent('portaAperta', { object: this.interactiveObject });
         }
     }
 
-    // Interfaccia di comunicazione ad eventi per disaccoppiare il codice
+    // Dispatch eventi globali
     _dispatchGlobalEvent(eventName, detailData) {
         document.dispatchEvent(new CustomEvent(eventName, { detail: detailData }));
     }

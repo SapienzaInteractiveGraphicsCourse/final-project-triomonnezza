@@ -1,19 +1,15 @@
 /**
- * MonsterAI.js  —  Intelligenza Artificiale del Mostro
- * RESPONSABILE: Alessandro (Ingegnere)
- *
- * Estratto e separato da PlayerController per poter gestire
- * più comportamenti (pattuglia, inseguimento, attacco).
+ * AI Mostro
  */
 
 import * as THREE from 'three';
 
 export class MonsterAI {
     /**
-     * @param {THREE.Object3D} mostroMesh - The 3D model of the monster
-     * @param {THREE.Camera} camera - The player's camera (target)
-     * @param {Array} monsterCollisionObjects - Array of Box3 for walls/doors (no furniture)
-     * @param {Array} doors - Array of interactive door meshes (so the monster can open them)
+     * @param {THREE.Object3D} mostroMesh Modello del mostro
+     * @param {THREE.Camera} camera Telecamera (giocatore)
+     * @param {Array} monsterCollisionObjects Muri/porte per collisioni
+     * @param {Array} doors Porte interattive
      */
     constructor(mostroMesh, camera, monsterCollisionObjects, doors, bigRooms = []) {
         this.mesh = mostroMesh;
@@ -22,32 +18,32 @@ export class MonsterAI {
         this.doors = doors || [];
         this.bigRooms = bigRooms || [];
 
-        // 5. Parametri di Stato dell'Inseguitore (AI del Mostro)
-        this.speed = 4.2;            // Velocità lineare del mostro
-        this.aggroRadius = 15;       // Raggio del sensore di sbarco (in metri)
-        this.attackRadius = 2.5;     // Distanza a cui il mostro scatta e attacca (Regista)
-        this.ATTACK_IMPACT_DELAY = 0.46; // secondi tra inizio animazione attacco e "impatto" (Game Over)
+        // Parametri AI Mostro
+        this.speed = 4.2;
+        this.aggroRadius = 15;
+        this.attackRadius = 2.5;
+        this.ATTACK_IMPACT_DELAY = 0.46;
 
         this._aiState = {
-            stuckTimer: 0,           // secondi senza spostamento reale
+            stuckTimer: 0,
             lastPos: mostroMesh ? mostroMesh.position.clone() : new THREE.Vector3(),
-            escapeDir: null,         // vettore di fuga temporaneo
-            escapeClock: 0,          // quanto dura la fuga
-            steerDir: new THREE.Vector3(), // direzione di steering corrente
-            isAttacking: false,      // true durante la sequenza di attacco (Regista)
-            attackTimer: 0,          // secondi trascorsi dall'inizio dell'attacco corrente
-            attackResolved: false,   // true dopo che 'playerMorto' è già stato dispatchato per questo attacco
-            hasNoticedPlayer: false, // true dopo lo "shock" di scoperta iniziale (Regista)
-            stuckCheckTimer: 0,      // accumula deltaTime per check periodico
-            hasEverSeenPlayer: false, // true se ha mai visto il giocatore
-            dynamicTeleportTimer: 0, // timer per il teletrasporto passivo
-            radiusStuckTimer: 0,     // timer per blocco in un raggio ristretto
+            escapeDir: null,
+            escapeClock: 0,
+            steerDir: new THREE.Vector3(),
+            isAttacking: false,
+            attackTimer: 0,
+            attackResolved: false,
+            hasNoticedPlayer: false,
+            stuckCheckTimer: 0,
+            hasEverSeenPlayer: false,
+            dynamicTeleportTimer: 0,
+            radiusStuckTimer: 0,
             radiusStuckCenter: mostroMesh ? mostroMesh.position.clone() : new THREE.Vector3(),
         };
     }
 
     /**
-     * Set the AI's collision objects (usually updated when a map loads)
+     * Aggiorna gli oggetti collisione dell'ambiente
      */
     setEnvironment(monsterCollisionObjects, doors, bigRooms = []) {
         this.monsterCollisionObjects = monsterCollisionObjects;
@@ -59,14 +55,13 @@ export class MonsterAI {
     }
 
     /**
-     * Verifica se non ci sono muri/porte chiuse tra il mostro e il giocatore
-     * Usa monsterCollisionObjects (muri/porte, NON l'arredamento).
+     * Controlla linea di vista verso il giocatore
      */
     _hasLineOfSightToPlayer() {
         if (!this.mesh || !this.camera) return false;
 
         const from = this.mesh.position.clone();
-        from.y += 1.2; // altezza approssimativa "occhi" del mostro
+        from.y += 1.2; // Altezza occhi mostro
 
         const to = this.camera.position;
         const toTarget = new THREE.Vector3().subVectors(to, from);
@@ -79,22 +74,22 @@ export class MonsterAI {
 
         for (let i = 0; i < this.monsterCollisionObjects.length; i++) {
             const box = this.monsterCollisionObjects[i];
-            if (box.isEmpty()) continue; // porta aperta o ostacolo rimosso: non blocca
+            if (box.isEmpty()) continue;
             if (ray.intersectBox(box, hitPoint)) {
                 const hitDist = from.distanceTo(hitPoint);
-                if (hitDist < dist - 0.25) return false; // qualcosa si frappone prima del giocatore
+                if (hitDist < dist - 0.25) return false;
             }
         }
         return true;
     }
 
     /**
-     * Apre automaticamente le porte chiuse vicino al mostro.
+     * Apre porte vicine
      */
     _tryOpenNearbyDoors() {
         if (!this.doors || this.doors.length === 0 || !this.mesh) return;
         const REOPEN_COOLDOWN_MS = 3000;
-        const OPEN_RADIUS = 4.5; // Increased from 3.0 to give more margin
+        const OPEN_RADIUS = 4.5;
 
         for (const hinge of this.doors) {
             const ud = hinge.userData;
@@ -112,8 +107,7 @@ export class MonsterAI {
     }
 
     /**
-     * Rete di sicurezza: teletrasporta il mostro a distanza ravvicinata al
-     * giocatore quando resta bloccato troppo a lungo.
+     * Teletrasporto d'emergenza vicino al giocatore
      */
     _teleportMonsterNearPlayer(minRadius = 6, maxRadius = 10) {
         if (!this.mesh || !this.camera) return;
@@ -125,7 +119,7 @@ export class MonsterAI {
             return Math.abs(px - r.cx) <= width / 2 && Math.abs(pz - r.cz) <= depth / 2;
         };
 
-        // 1. Try to teleport safely into the middle of an adjacent big room
+        // 1. Prova a teletrasportare in una stanza grande adiacente
         if (this.bigRooms && this.bigRooms.length > 0) {
             const validRooms = [];
             let bestRoom = null;
@@ -134,7 +128,7 @@ export class MonsterAI {
             let maxDist = -1;
 
             for (const room of this.bigRooms) {
-                // Non teletrasportare mai nella stessa stanza in cui si trova il giocatore!
+                // Evita la stanza del giocatore
                 if (isPointInRoom(player.x, player.z, room)) continue;
 
                 const dx = room.cx - player.x;
@@ -167,7 +161,7 @@ export class MonsterAI {
             }
         }
 
-        // 2. Fallback sulle porte se mancano stanze valide
+        // 2. Fallback sulle porte
         if (this.doors && this.doors.length > 0) {
             const validDoors = [];
             let bestDoor = null;
@@ -193,7 +187,7 @@ export class MonsterAI {
             }
         }
 
-        // 3. Fallback geometrico di emergenza
+        // 3. Fallback geometrico d'emergenza
         const radius = minRadius + Math.random() * (maxRadius - minRadius);
         const testSize = new THREE.Vector3(1.5, 2.8, 1.5);
 
@@ -228,12 +222,12 @@ export class MonsterAI {
 
         const ai = this._aiState;
 
-        // ── Vettore verso il giocatore ────────────────────────────────────────
+        // Vettore verso giocatore
         const toPlayer = new THREE.Vector3().subVectors(this.camera.position, this.mesh.position);
         toPlayer.y = 0;
         const distanzaEuclidea = toPlayer.length();
 
-        // ── "Shock" alla prima individuazione (Regista) ────────────────────────
+        // "Shock" prima individuazione
         if (distanzaEuclidea <= this.aggroRadius) {
             ai.hasEverSeenPlayer = true;
             if (!ai.hasNoticedPlayer) {
@@ -244,8 +238,8 @@ export class MonsterAI {
             ai.hasNoticedPlayer = false;
         }
 
-        // ── Inseguimento Passivo (Teletrasporto Dinamico) ─────────────────────
-        // Si attiva SEMPRE se il mostro è fuori dall'aggroRadius (anche dopo averci visto)
+        // Inseguimento Passivo (Teletrasporto Dinamico)
+        // Attivo se fuori dall'aggroRadius
         if (distanzaEuclidea > this.aggroRadius) {
             ai.dynamicTeleportTimer += deltaTime;
             if (ai.dynamicTeleportTimer >= 6.0) {
@@ -254,12 +248,12 @@ export class MonsterAI {
                 ai.lastPos.copy(this.mesh.position);
                 if (ai.radiusStuckCenter) ai.radiusStuckCenter.copy(this.mesh.position);
             }
-            return; // Se è lontano, gestiamo solo il passivo e ci fermiamo qui
+            return; // Lontano, stop qui
         } else {
             ai.dynamicTeleportTimer = 0;
         }
 
-        // ── Sequenza di attacco (Regista) ─────────────────────────────────────
+        // Sequenza di attacco
         if (!ai.isAttacking && distanzaEuclidea <= this.attackRadius) {
             if (this._hasLineOfSightToPlayer()) {
                 ai.isAttacking = true;
@@ -287,15 +281,15 @@ export class MonsterAI {
                 ai.isAttacking = false;
             }
 
-            return; // durante l'attacco il mostro resta fermo, niente steering
+            return; // Nessun movimento durante l'attacco
         }
 
-        // ── Controllo Blocco Globale (Fermo nello stesso raggio per 6 secondi) ─
+        // Blocco Globale (fermo nello stesso raggio per 6s)
         if (!ai.radiusStuckCenter) ai.radiusStuckCenter = this.mesh.position.clone();
 
         const hasLOS = this._hasLineOfSightToPlayer();
 
-        // Se è nella linea di vista, NON si teletrasporta MAI via timer (insegue sempre)
+        // Se in visuale, nessun teletrasporto temporizzato
         if (hasLOS) {
             ai.radiusStuckTimer = 0;
             ai.radiusStuckCenter.copy(this.mesh.position);
@@ -314,7 +308,7 @@ export class MonsterAI {
                     ai.escapeClock = 0;
                     return;
                 }
-                // Aggiorna il centro per i prossimi 6 secondi
+                // Aggiorna centro
                 ai.radiusStuckCenter.copy(this.mesh.position);
                 ai.radiusStuckTimer = 0;
             }
@@ -323,11 +317,11 @@ export class MonsterAI {
         this.mesh.lookAt(this.camera.position.x, this.mesh.position.y, this.camera.position.z);
 
         const monsterSize = new THREE.Vector3(1.5, 2.8, 1.5);
-        const RAY_LEN = 2.5;  // distanza di "vista" davanti al mostro
-        const STEER_ANGLES = [-0.8, -0.4, 0, 0.4, 0.8]; // ventaglio di 5 raggi (rad)
+        const RAY_LEN = 2.5;
+        const STEER_ANGLES = [-0.8, -0.4, 0, 0.4, 0.8]; // 5 raggi (rad)
         const baseDir = toPlayer.clone().normalize();
 
-        // ── Ray-casting a ventaglio ───────────────────────────────────────────
+        // Ray-casting a ventaglio
         let bestScore = -1;
         let bestDir = baseDir.clone();
 
@@ -360,16 +354,16 @@ export class MonsterAI {
             }
         }
 
-        // ── Prova ad aprire porte vicine chiuse ────────────────────────────────
+        // Apre porte vicine chiuse
         this._tryOpenNearbyDoors();
 
-        // ── Fuga da angolo: se bloccato da troppo ─────────────────────────────
+        // Fuga da angolo se bloccato
         ai.stuckCheckTimer += deltaTime;
         if (ai.stuckCheckTimer >= 0.5) {
             const movedDist = this.mesh.position.distanceTo(ai.lastPos);
             ai.lastPos.copy(this.mesh.position);
 
-            // Se in 0.5 secondi si è mosso di meno di 0.3 unità, è bloccato
+            // Meno di 0.3 unità in 0.5s = bloccato
             if (movedDist < 0.3) {
                 ai.stuckTimer += ai.stuckCheckTimer;
             } else {
@@ -380,7 +374,7 @@ export class MonsterAI {
             ai.stuckCheckTimer = 0;
         }
 
-        // ── Teletrasporto di emergenza ────────────────────────────────────────
+        // Teletrasporto emergenza
         if (ai.stuckTimer > 4.0) {
             this._teleportMonsterNearPlayer();
             ai.stuckTimer = 0;
@@ -397,7 +391,7 @@ export class MonsterAI {
                     0,
                     baseDir.x + (Math.random() - 0.5) * 0.6
                 ).normalize();
-                ai.escapeClock = 0.6; // dura 0.6 s
+                ai.escapeClock = 0.6;
             }
             if (ai.escapeClock > 0) {
                 ai.escapeClock -= deltaTime;
@@ -408,7 +402,7 @@ export class MonsterAI {
             }
         }
 
-        // ── Smooth steering ───────────────────────────────────────────────────
+        // Smooth steering
         ai.steerDir.lerp(bestDir, Math.min(1, deltaTime * 8));
         ai.steerDir.y = 0;
         if (ai.steerDir.lengthSq() < 0.0001) ai.steerDir.copy(bestDir);
@@ -416,7 +410,7 @@ export class MonsterAI {
 
         const moveStep = ai.steerDir.clone().multiplyScalar(this.speed * deltaTime);
 
-        // ── Collisione sliding separata per X e Z ─────────────────────────────
+        // Collisione sliding separata X e Z
         const futurePosX = this.mesh.position.clone();
         futurePosX.x += moveStep.x;
         const boxX = new THREE.Box3().setFromCenterAndSize(futurePosX, monsterSize);
