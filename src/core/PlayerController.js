@@ -193,7 +193,7 @@ export class PlayerController {
         // --- GESTIONE DEI VALORI DELLA STAMINA E VELOCITÀ ---
         const staMuovendo = this.keys.forward || this.keys.backward || this.keys.left || this.keys.right;
 
-        if (this.keys.space && staMuovendo && this.stamina > 0) {
+        if (this.keys.space && staMuovendo && this.stamina > 0 && !this.wasStaminaEmpty) {
             this.isSprinting = true;
             this.moveSpeed = this.sprintMoveSpeed;
             this.stamina -= this.staminaDrainRate * deltaTime; // Consumo
@@ -210,7 +210,7 @@ export class PlayerController {
             // Ricarica solo se non si sta scattando
             if (this.stamina < this.maxStamina) {
                 this.stamina += this.staminaRegenRate * deltaTime; // Ricarica rapida (in 2 secondi)
-                if (this.stamina > 0.5) { // Reset flag when regenerated slightly
+                if (this.stamina >= this.maxStamina) { // Reset flag when regenerated fully
                     this.wasStaminaEmpty = false;
                 }
                 if (this.stamina > this.maxStamina) this.stamina = this.maxStamina;

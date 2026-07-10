@@ -107,7 +107,7 @@ export class GameUIController {
             // Start BGM on first interaction
             if (locked && !window._bgmStarted) {
                 window._bgmStarted = true;
-                AudioSystem.playBGM();
+                AudioSystem.startBGM();
                 AudioSystem.setBGMState('ambience');
             }
         });

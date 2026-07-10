@@ -181,7 +181,7 @@ function animate() {
             toMonster.y = 0;
             const distanza   = toMonster.length();
 
-            const farEdge    = player.mostroAggroRadius;
+            const farEdge    = monsterAI ? monsterAI.aggroRadius : 15;
             const nearEdge   = player.mostroAttackRadius || 2.5;
             const fearFactor = 1 - Math.min(1, Math.max(0, (distanza - nearEdge) / (farEdge - nearEdge)));
 
