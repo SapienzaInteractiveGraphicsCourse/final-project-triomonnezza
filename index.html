@@ -218,6 +218,20 @@
             opacity: 0;
         }
 
+        /* ── Sequenza di vittoria (Regista) — l'opposto della morte: luce che invade lo schermo ── */
+        #light-burst-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9990; /* sopra il gioco, sotto la schermata di vittoria (9999) */
+            pointer-events: none;
+            opacity: 0;
+            background: radial-gradient(circle at 50% 50%,
+                rgba(255,250,220,0.95) 0%,
+                rgba(255,230,150,0.6) 25%,
+                rgba(255,210,100,0.15) 50%,
+                transparent 75%);
+        }
+
         /* ── Main Menu Title ── */
         .title-container {
             margin-bottom: 40px;
@@ -377,6 +391,7 @@
     <div class="noise-overlay"></div>
     <div id="fade-overlay"></div>
     <div id="blood-splatter-overlay"></div>
+    <div id="light-burst-overlay"></div>
 
     <div id="main-menu" class="overlay-screen">
         <div class="title-container">
@@ -430,7 +445,7 @@
         </div>
     </div>
 
-    <div id="win-overlay" class="overlay-screen" style="display: none; background: rgba(0, 0, 0, 0.95); z-index: 9999;">
+    <div id="win-overlay" class="overlay-screen" style="display: none; opacity: 0; background: rgba(0, 0, 0, 0.95); z-index: 9999;">
         <div class="title-container">
             <h1 class="glitch-text" data-text="ESCAPED" style="color: var(--gold); text-shadow: 4px 4px 0 #000;">ESCAPED</h1>
             <p class="subtitle" style="color: var(--bone);">You have unlocked the nightmare.</p>

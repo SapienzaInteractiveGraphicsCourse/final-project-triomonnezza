@@ -46,7 +46,7 @@ const monster = new Monster();
 // i due sistemi si sovrascriverebbero a vicenda in modo imprevedibile
 // (stesso tipo di conflitto già visto con la camera).
 const TORCH_BATTERY_MIN_PERCENT = 30;  // percentuale minima di luce residua
-const TORCH_DRAIN_INTERVAL_SEC  = 1;   // ogni quanti secondi perde l'1% (valore di test scelto dall'utente)
+const TORCH_DRAIN_INTERVAL_SEC  = 5;   // ogni quanti secondi perde l'1% (valore di test scelto dall'utente)
 let torchBatteryPercent = 100;
 let _torchDrainTimer = 0;
 const _torchBatteryMult = { mult: 1.0 }; // valore animato in tween, applicato ogni frame
@@ -186,6 +186,21 @@ document.addEventListener('itemRaccolto', (e) => {
     }
 });
 
+/**
+ * Easing "back-out" per l'apertura porte (Regista): supera leggermente il
+ * target e torna dolcemente, tutto in un'UNICA curva continua (a differenza
+ * di più tween concatenati, non c'è mai un punto in cui la velocità si
+ * azzera bruscamente a metà — risultato più fluido/sinuoso).
+ * `overshootStrength` più basso del default di tween.js (1.70158, pensato
+ * per animazioni UI vivaci): calibrato per una porta pesante, non un pulsante.
+ */
+function _doorBackOut(t) {
+    const overshootStrength = 1.2;
+    const s = overshootStrength;
+    t -= 1;
+    return t * t * ((s + 1) * t + s) + 1;
+}
+
 document.addEventListener('portaAperta', (e) => {
     const hitMesh = e.detail.object;
     const hinge = hitMesh.parentHinge || hitMesh;
@@ -200,45 +215,118 @@ document.addEventListener('portaAperta', (e) => {
     hinge.userData.isAnimating = true;
 
     if (wasOpen) {
-        // ── CLOSING ─────────────────────────────────────────────────────
-        // Restore closed collision box immediately so the player can't
-        // slip through while the door is swinging shut.
+        // ── CHIUSURA (Regista): decisa e pesante — la porta accelera per il
+        // proprio peso/momento e sbatte contro lo stipite (piccolo rimbalzo
+        // "thud" oltre la posizione di chiusura, poi assestamento secco).
+        // Nettamente più rapida dell'apertura: niente esitazione, il peso
+        // la richiude da sola.
         if (hinge.userData.collisionBox && hinge.userData.closedBoxMin) {
             hinge.userData.collisionBox.set(
                 hinge.userData.closedBoxMin,
                 hinge.userData.closedBoxMax
             );
         }
-        
-        AudioSystem.playPositionalSoundAt('close_door', scene, hinge.position, 10, 1.0);
-        
-        const targetY = hinge.userData.startRotationY;
-        new TWEEN.Tween(hinge.rotation)
-            .to({ y: targetY }, 800)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .onComplete(() => { hinge.userData.isAnimating = false; })
-            .start();
-    } else {
-        // ── OPENING ─────────────────────────────────────────────────────
-        // Clear collision during the swing so the player can walk through.
-        if (hinge.userData.collisionBox) {
-            hinge.userData.collisionBox.makeEmpty();
-        }
-        
-        AudioSystem.playPositionalSoundAt('open_door', scene, hinge.position, 10, 1.0);
 
-        const targetY = hinge.userData.startRotationY + (Math.PI / 2);
-        new TWEEN.Tween(hinge.rotation)
-            .to({ y: targetY }, 800)
+        const targetY    = hinge.userData.startRotationY;
+        const overshootY = targetY - 0.07; // rimbalza OLTRE il chiuso, in modo più marcato — sbatte forte contro lo stipite
+
+        const swing = new TWEEN.Tween(hinge.rotation)
+            .to({ y: overshootY }, 550)
+            .easing(TWEEN.Easing.Quadratic.In) // accelera: il peso la trascina, più rapida di prima
+            .onComplete(() => {
+                // Il suono dell'impatto parte QUI — quando l'anta arriva
+                // davvero contro lo stipite (fine dello swing) — non
+                // all'inizio dell'interazione. Il "botto" di un file audio è
+                // quasi sempre concentrato nei primissimi istanti del clip:
+                // farlo partire troppo presto (mentre la porta sta ancora
+                // iniziando lo swing) lo sfasa dal colpo visibile, che è
+                // proprio il problema notato ("sbatte senza far rumore" — il
+                // rumore c'era, ma fuori sincrono).
+                const closeSound = AudioSystem.playPositionalSoundAt('close_door', scene, hinge.position, 10, 1.0);
+                document.dispatchEvent(new CustomEvent('portaSbattuta'));
+
+                // Il file dura comunque più del necessario: lasciamo
+                // respirare il botto + una breve coda naturale, poi
+                // dissolvenza (non uno stop secco, per evitare un click)
+                // invece di farlo continuare per secondi.
+                if (closeSound) {
+                    setTimeout(() => {
+                        if (!closeSound.isPlaying) return;
+                        const proxy = { vol: closeSound.getVolume() };
+                        new TWEEN.Tween(proxy)
+                            .to({ vol: 0 }, 250)
+                            .easing(TWEEN.Easing.Quadratic.In)
+                            .onUpdate(() => { closeSound.setVolume(proxy.vol); })
+                            .onComplete(() => { closeSound.stop(); })
+                            .start();
+                    }, 600);
+                }
+            });
+
+        const thud = new TWEEN.Tween(hinge.rotation)
+            .to({ y: targetY }, 150)
             .easing(TWEEN.Easing.Quadratic.Out)
             .onComplete(() => {
-                // Recompute the box from the hinge's world-space position at 90°
-                // so the open door still physically blocks movement.
+                hinge.userData.isAnimating = false;
+            });
+
+        swing.chain(thud);
+        swing.start();
+    } else {
+        // ── APERTURA (Regista): lenta e cigolante — attrito iniziale (la
+        // porta resta "incollata" un istante prima di liberarsi), poi UNA
+        // SOLA curva continua che accelera, supera leggermente il target per
+        // inerzia e torna dolcemente in posizione — non più tre tween
+        // concatenati (che si "fermavano" ai bordi tra una fase e l'altra,
+        // risultando isolati/a scatti): una curva "back-out" fatta apposta
+        // per questo genere di rimbalzo fisico è continua per costruzione.
+        // NB (Regista): NON svuotiamo subito il box di collisione come prima.
+        // Con lo swing lungo ~2.4s, farlo subito lasciava la porta "libera"
+        // per il pathfinding del mostro molto prima che la sua foglia fosse
+        // visivamente aperta abbastanza da lasciar passare qualcosa — il
+        // mostro, se in attesa lì vicino, si fiondava attraverso la porta
+        // ancora quasi chiusa, sembrando "incastrato" nell'anta che stava
+        // ancora girando. Ora il varco si libera solo quando la porta è
+        // visivamente aperta a sufficienza (circa metà dello swing).
+        const doorOpenClearanceDelay = 220 + 2200 * 0.45; // ~1210ms: attrito + ~45% dello swing
+
+        const baseY      = hinge.userData.startRotationY;
+        const targetY    = baseY + (Math.PI / 2);
+        const stickY     = baseY + (targetY - baseY) * 0.035; // micro-movimento: vince l'attrito iniziale
+
+        const stick = new TWEEN.Tween(hinge.rotation)
+            .to({ y: stickY }, 220)
+            .easing(TWEEN.Easing.Sinusoidal.In) // parte lentissima: si "stacca" dall'attrito
+            .onComplete(() => {
+                // Il suono del cigolio parte QUI (non all'inizio dell'interazione)
+                // così la parte udibile combacia con l'inizio dello swing
+                // visibile vero e proprio, non con il micro-movimento
+                // d'attrito impercettibile. Rallentato (playbackRate) per
+                // durare di più e combaciare meglio con lo swing lento.
+                const sound = AudioSystem.playPositionalSoundAt('open_door', scene, hinge.position, 10, 1.0);
+                if (sound && sound.setPlaybackRate) sound.setPlaybackRate(0.75);
+            });
+
+        setTimeout(() => {
+            if (hinge.userData.collisionBox) {
+                hinge.userData.collisionBox.makeEmpty();
+            }
+        }, doorOpenClearanceDelay);
+
+        const swing = new TWEEN.Tween(hinge.rotation)
+            .to({ y: targetY }, 2200)
+            .easing(_doorBackOut) // curva unica: swing + overshoot + assestamento, tutto in un movimento continuo
+            .onComplete(() => {
+                // Recompute the box from the hinge's world-space position at
+                // 90° so the open door still physically blocks movement.
+                // Fatto solo ora che la porta è VERAMENTE ferma.
                 hinge.updateMatrixWorld(true);
                 hinge.userData.collisionBox.setFromObject(hinge);
                 hinge.userData.isAnimating = false;
-            })
-            .start();
+            });
+
+        stick.chain(swing);
+        stick.start();
     }
 });
 
@@ -252,12 +340,38 @@ document.addEventListener('portaGoalAperta', (e) => {
 
     AudioSystem.playPositionalSoundAt('door_key', scene, group.position, 10, 1.0);
 
+    // ── Sequenza di vittoria (Regista) — l'opposto della morte: invece di
+    // sangue/buio, la luce invade lo schermo e delle scintille dorate
+    // salgono, poi tutto dissolve in un bianco caldo prima della scritta
+    // finale (che sfuma dentro, non compare di colpo). ──────────────────
+    const lightOverlay = document.getElementById('light-burst-overlay');
+    if (lightOverlay) {
+        lightOverlay.style.transition = 'opacity 500ms ease-out';
+        lightOverlay.style.opacity = '1';
+        generateVictorySparkles(lightOverlay);
+    }
+
     new TWEEN.Tween(group.scale)
         .to({ x: 0.001, y: 0.001, z: 0.001 }, 600)
         .easing(TWEEN.Easing.Back.In)
-        .onComplete(() => { scene.remove(group); setTimeout(showWinScreen, 400); })
+        .onComplete(() => { scene.remove(group); })
         .start();
     document.dispatchEvent(new CustomEvent('logMessaggioUI', { detail: { testo: 'The door opens... You are free!' } }));
+
+    // Dopo un momento (luce e scintille ben visibili), dissolvenza al
+    // bianco caldo riusando #fade-overlay (stesso elemento della morte,
+    // ma bianco invece che nero — libertà invece di buio)...
+    setTimeout(() => {
+        const fadeOverlay = document.getElementById('fade-overlay');
+        if (fadeOverlay) {
+            fadeOverlay.style.transition = 'opacity 1000ms ease-in';
+            fadeOverlay.style.backgroundColor = '#fff8ec';
+            fadeOverlay.style.opacity = '1';
+        }
+    }, 900);
+
+    // ...e la scritta "ESCAPED" sfuma dentro dalla luce.
+    setTimeout(showWinScreen, 900 + 1000);
 });
 
 document.addEventListener('horrorTrigger', (e) => {
@@ -268,15 +382,57 @@ document.addEventListener('horrorTrigger', (e) => {
     }
 });
 
+/** Genera scintille dorate che salgono e sfumano, dentro il contenitore dato */
+function generateVictorySparkles(container) {
+    const count = 14 + Math.floor(Math.random() * 8);
+    for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'victory-sparkle';
+        const size = _randRange(0.3, 0.9); // vw
+        const startTop = _randRange(60, 95); // vh
+        const left = _randRange(5, 95); // vw
+        const riseDur = _randRange(2.5, 4.5);
+
+        el.style.position = 'absolute';
+        el.style.left = `${left.toFixed(1)}vw`;
+        el.style.top = `${startTop.toFixed(1)}vh`;
+        el.style.width = `${size.toFixed(2)}vw`;
+        el.style.height = `${size.toFixed(2)}vw`;
+        el.style.borderRadius = '50%';
+        el.style.background = 'radial-gradient(circle, #fff8dc 0%, #ffd700 60%, transparent 100%)';
+        el.style.boxShadow = '0 0 6px 2px rgba(255,215,0,0.8)';
+        el.style.opacity = '0';
+        el.style.transition = `top ${riseDur.toFixed(1)}s ease-out, opacity ${riseDur.toFixed(1)}s ease-out`;
+        container.appendChild(el);
+
+        // Piccolo ritardo scaglionato prima di far partire la salita, così
+        // non partono tutte insieme nello stesso identico istante
+        setTimeout(() => {
+            el.style.opacity = _randRange(0.7, 1).toFixed(2);
+            el.style.top = `${_randRange(-10, 20).toFixed(1)}vh`;
+        }, _randRange(0, 400));
+    }
+}
 
 function showWinScreen() {
     if (player) player.controls.unlock();
     const win = document.getElementById('win-overlay');
     if (win) {
         win.style.display = 'flex';
+        // Forza un reflow prima di attivare la transizione di opacità (stesso
+        // motivo di showGameOverScreen): senza, rischia di saltare l'animazione.
+        void win.offsetWidth;
+        win.style.opacity = '1';
     }
 }
 
+
+document.addEventListener('mostroNotaGiocatore', () => {
+    // Shock alla prima individuazione (Regista): un sussulto preciso invece
+    // di un'escalation anonima quando il mostro comincia a inseguirti.
+    AudioSystem.playSound('strong_breathing');
+    monster.notice();
+});
 
 document.addEventListener('mostroAttacca', () => {
     // Il mostro è abbastanza vicino da colpire (Regista: mostroAttackRadius,
@@ -341,6 +497,44 @@ function _makeBloodBlast(topVh, leftVw, sizeVw) {
     return el;
 }
 
+/** Crea una colatura verticale che scende (stondata in cima, goccia in fondo) */
+function _makeBloodDrip(topVh, leftVw) {
+    const el = document.createElement('div');
+    el.className = 'blood-drip';
+    el.style.position = 'absolute';
+
+    const width  = _randRange(0.6, 1.8);  // vw
+    const height = _randRange(8, 22);     // vh
+
+    el.style.top    = `${topVh.toFixed(1)}vh`;
+    el.style.left   = `${leftVw.toFixed(1)}vw`;
+    el.style.width  = `${width.toFixed(1)}vw`;
+    el.style.height = `${height.toFixed(1)}vh`;
+    // Stondato in cima (attaccato alla macchia), assottigliato in fondo
+    el.style.borderRadius = '50% 50% 45% 45% / 60% 60% 25% 25%';
+    el.style.transform = `rotate(${_randRange(-6, 6).toFixed(1)}deg)`; // leggermente storta, non perfettamente verticale
+    el.style.opacity = _randRange(0.75, 0.95).toFixed(2);
+
+    const c1 = _randomBloodColor();
+    const c2 = _randomBloodColor();
+    el.style.background = `linear-gradient(to bottom, ${c1} 0%, ${c2} 55%, ${c2} 82%, transparent 100%)`;
+
+    // Piccola goccia rigonfia in fondo (il "rigonfiamento" tipico di una colatura)
+    const bead = document.createElement('div');
+    const beadSize = width * 1.4;
+    bead.style.position = 'absolute';
+    bead.style.bottom = '2%';
+    bead.style.left = '50%';
+    bead.style.width  = `${beadSize.toFixed(1)}vw`;
+    bead.style.height = `${(beadSize * 0.85).toFixed(1)}vw`;
+    bead.style.transform = 'translateX(-50%)';
+    bead.style.borderRadius = '50%';
+    bead.style.background = `radial-gradient(circle at 35% 30%, ${c1}, ${c2})`;
+    el.appendChild(bead);
+
+    return el;
+}
+
 function generateBloodSplatter() {
     const container = document.getElementById('blood-splatter-overlay');
     if (!container) return;
@@ -358,6 +552,18 @@ function generateBloodSplatter() {
     for (const pos of positions) {
         const size = _randRange(9, 15); // vw
         container.appendChild(_makeBloodBlast(pos.top, pos.left, size));
+
+        // Colatura che scende dalla macchia (non sempre, per varietà —
+        // non ha senso farla colare da una macchia già vicina al bordo
+        // inferiore dello schermo, uscirebbe subito dalla vista)
+        if (pos.top < 70 && Math.random() < 0.7) {
+            const dripCount = 1 + Math.floor(Math.random() * 2);
+            for (let i = 0; i < dripCount; i++) {
+                const dripLeft = pos.left + _randRange(size * 0.15, size * 0.7);
+                const dripTop  = pos.top + size * 0.55;
+                container.appendChild(_makeBloodDrip(dripTop, dripLeft));
+            }
+        }
     }
 
     // Qualche goccia isolata più piccola, sparsa verso il centro per
@@ -627,6 +833,28 @@ function computeLowBatteryFlickerMult(deltaTime, percent) {
 // di 1%, poi notifica il TweenManager che anima morbidamente il nuovo
 // livello di luce (invece di un salto secco).
 // ==========================================
+// ==========================================
+// SPRINT FOV KICK (Regista)
+// Il campo visivo si allarga leggermente durante lo sprint (sensazione di
+// velocità, classico effetto FPS), per poi tornare normale quando ci si ferma.
+// ==========================================
+const CAMERA_BASE_FOV   = 75; // deve combaciare col valore usato in new THREE.PerspectiveCamera(...)
+const CAMERA_SPRINT_FOV = 84;
+let _currentFov = CAMERA_BASE_FOV;
+
+function updateSprintFOV(deltaTime) {
+    if (!player) return;
+    const isSprintingNow = player.controls.isLocked && player.isSprinting &&
+        (player.keys.forward || player.keys.backward || player.keys.left || player.keys.right);
+    const targetFov = isSprintingNow ? CAMERA_SPRINT_FOV : CAMERA_BASE_FOV;
+
+    _currentFov += (targetFov - _currentFov) * Math.min(1, deltaTime * 8);
+    if (Math.abs(camera.fov - _currentFov) > 0.01) {
+        camera.fov = _currentFov;
+        camera.updateProjectionMatrix();
+    }
+}
+
 function updateTorchBattery(deltaTime) {
     if (!player || torchBatteryPercent <= TORCH_BATTERY_MIN_PERCENT) return;
 
@@ -681,6 +909,7 @@ function animate() {
 
         updateTorchSway(deltaTime, fearFactor);
         updateTorchBattery(deltaTime);
+        updateSprintFOV(deltaTime);
 
         // Applica il calo batteria SOPRA l'intensità che PlayerController ha
         // appena calcolato per questo frame (base + eventuale sfarfallio).

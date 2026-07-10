@@ -29,6 +29,8 @@
  *                           la rotazione fisica dell'anta è già gestita in main.js
  *                           insieme alla collisione, per non animare due volte
  *                           la stessa proprietà)
+ *   - 'portaSbattuta'     → scossa più marcata nel preciso istante in cui la
+ *                           porta sbatte in chiusura (fine del rimbalzo)
  *   - 'mostroInMovimento' → riservato per future reazioni ambientali; l'oscillazione
  *                           delle braccia è già gestita internamente da Monster.js
  *                           (ha bisogno del proprio TWEEN.Group isolato)
@@ -54,6 +56,7 @@ export class TweenManager {
 
     _initListeners() {
         document.addEventListener('portaAperta',       (e) => this._onPortaAperta(e.detail));
+        document.addEventListener('portaSbattuta',     ()  => this._onPortaSbattuta());
         document.addEventListener('itemRaccolto',      (e) => this._onItemRaccolto(e.detail));
         document.addEventListener('horrorTrigger',     (e) => this._onHorrorTrigger(e.detail));
         document.addEventListener('mostroInMovimento', (e) => this._onMostroMoves(e.detail));
@@ -104,6 +107,16 @@ export class TweenManager {
     // ─────────────────────────────────────────────────────────────────
     _onPortaAperta() {
         this._cameraShake(90, 3); // piccolo "colpo" da 3px, quasi impercettibile
+    }
+
+    /**
+     * Impatto della chiusura (Regista): scossa più marcata del semplice
+     * "cigolio" di _onPortaAperta, dispatchata da main.js nel preciso
+     * istante in cui l'anta sbatte contro lo stipite (fine del rimbalzo di
+     * chiusura), non quando l'interazione inizia.
+     */
+    _onPortaSbattuta() {
+        this._cameraShake(200, 12);
     }
 
     // ─────────────────────────────────────────────────────────────────

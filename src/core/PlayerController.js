@@ -122,7 +122,7 @@ export class PlayerController {
             
             // Ruotiamo la torcia. Se punta di lato, la giriamo sull'asse Y.
             // Azzero le altre rotazioni per evitare che punti in alto o in basso.
-            object.rotation.set(0, -Math.PI / 2, 0);
+            object.rotation.set(0, Math.PI / 2, 0);
 
             this.camera.add(object);
             this.flashlightModel = object;
@@ -429,6 +429,39 @@ export class PlayerController {
     // ────────────────────────────────────────────────────────────────────────────
 
     // AI DEL MOSTRO: Ray-Steering con escape da angoli
+    /**
+     * Verifica se non ci sono muri/porte chiuse tra il mostro e il giocatore
+     * (Regista): il mostro non deve poter "vedere"/colpire attraverso una
+     * porta chiusa solo perché sei abbastanza vicino in linea d'aria.
+     * Riusa lo STESSO array di Box3 (collisionObjects) già usato per il
+     * movimento — quando una porta si apre il suo box viene "svuotato"
+     * (vedi main.js), quindi smette automaticamente di bloccare la vista
+     * senza bisogno di nessuna sincronizzazione aggiuntiva qui.
+     */
+    _hasLineOfSightToPlayer(mostroMesh) {
+        const from = mostroMesh.position.clone();
+        from.y += 1.2; // altezza approssimativa "occhi" del mostro
+
+        const to = this.camera.position;
+        const toTarget = new THREE.Vector3().subVectors(to, from);
+        const dist = toTarget.length();
+        if (dist < 0.001) return true;
+        const dir = toTarget.clone().normalize();
+
+        const ray = new THREE.Ray(from, dir);
+        const hitPoint = new THREE.Vector3();
+
+        for (let i = 0; i < this.collisionObjects.length; i++) {
+            const box = this.collisionObjects[i];
+            if (box.isEmpty()) continue; // porta aperta o ostacolo rimosso: non blocca
+            if (ray.intersectBox(box, hitPoint)) {
+                const hitDist = from.distanceTo(hitPoint);
+                if (hitDist < dist - 0.25) return false; // qualcosa si frappone prima del giocatore
+            }
+        }
+        return true;
+    }
+
     _updateMostroAI(mostroMesh, deltaTime) {
         // Stato persistente inizializzato pigro (sopravvive ai frame)
         if (this._aiState === undefined) {
@@ -441,6 +474,7 @@ export class PlayerController {
                 isAttacking: false,      // true durante la sequenza di attacco (Regista)
                 attackTimer: 0,          // secondi trascorsi dall'inizio dell'attacco corrente
                 attackResolved: false,   // true dopo che 'playerMorto' è già stato dispatchato per questo attacco
+                hasNoticedPlayer: false, // true dopo lo "shock" di scoperta iniziale (Regista)
             };
         }
         const ai = this._aiState;
@@ -450,6 +484,20 @@ export class PlayerController {
         toPlayer.y = 0;
         const distanzaEuclidea = toPlayer.length();
 
+        // ── "Shock" alla prima individuazione (Regista) ────────────────────────
+        // Rileva il MOMENTO in cui il mostro entra nel raggio di aggro (non ogni
+        // frame in cui ci resta): dà un colpo di scena preciso invece di
+        // un'escalation anonima. Si "dimentica" se il giocatore esce dal raggio,
+        // così può "notare" di nuovo in un secondo momento.
+        if (distanzaEuclidea <= this.mostroAggroRadius) {
+            if (!ai.hasNoticedPlayer) {
+                ai.hasNoticedPlayer = true;
+                this._dispatchGlobalEvent('mostroNotaGiocatore', { mostro: mostroMesh });
+            }
+        } else {
+            ai.hasNoticedPlayer = false;
+        }
+
         // ── Sequenza di attacco (Regista) ─────────────────────────────────────
         // Il mostro non colpisce più "incollato" al giocatore: scatta in avanti
         // quando sei a un paio di passi (mostroAttackRadius), così l'animazione
@@ -458,28 +506,32 @@ export class PlayerController {
         // sincronizzato con il momento di "impatto" dell'animazione
         // (ATTACK_IMPACT_DELAY), non nell'istante in cui scatta l'attacco.
         if (!ai.isAttacking && distanzaEuclidea <= this.mostroAttackRadius) {
-            ai.isAttacking    = true;
-            ai.attackTimer    = 0;
-            ai.attackResolved = false;
-            mostroMesh.lookAt(this.camera.position.x, mostroMesh.position.y, this.camera.position.z);
+            // Non attacca (né gioca l'animazione) se una porta chiusa o un
+            // muro si frappone: eri abbastanza vicino solo in linea d'aria.
+            if (this._hasLineOfSightToPlayer(mostroMesh)) {
+                ai.isAttacking    = true;
+                ai.attackTimer    = 0;
+                ai.attackResolved = false;
+                mostroMesh.lookAt(this.camera.position.x, mostroMesh.position.y, this.camera.position.z);
 
-            if (window.DEBUG_GODMODE) {
-                // Modalità test (vedi main.js, tasto G): stessa animazione,
-                // ma niente game over — permette di osservarla ripetutamente.
-                this._dispatchGlobalEvent('playerAttaccatoDebug', { mostro: mostroMesh });
-            } else {
-                // NB: NON chiamiamo this.controls.unlock() qui. Farlo
-                // rilascia subito il pointer-lock, e la UI (index.html)
-                // interpreta qualunque pointer-unlock come "torna al menu/
-                // pausa" mostrando l'overlay delle istruzioni — sembrava una
-                // pausa automatica, e cliccando per "riprendere" prima che
-                // l'attacco si risolvesse (460ms dopo) si moriva comunque,
-                // dando l'impressione di una morte a tradimento. La morte è
-                // già garantita dal timer qui sotto (ai.attackResolved),
-                // quindi non serve bloccare i controlli in anticipo:
-                // showGameOverScreen() fa già l'unlock al momento giusto,
-                // quando la schermata di game over appare davvero.
-                this._dispatchGlobalEvent('mostroAttacca', { mostro: mostroMesh });
+                if (window.DEBUG_GODMODE) {
+                    // Modalità test (vedi main.js, tasto G): stessa animazione,
+                    // ma niente game over — permette di osservarla ripetutamente.
+                    this._dispatchGlobalEvent('playerAttaccatoDebug', { mostro: mostroMesh });
+                } else {
+                    // NB: NON chiamiamo this.controls.unlock() qui. Farlo
+                    // rilascia subito il pointer-lock, e la UI (index.html)
+                    // interpreta qualunque pointer-unlock come "torna al menu/
+                    // pausa" mostrando l'overlay delle istruzioni — sembrava una
+                    // pausa automatica, e cliccando per "riprendere" prima che
+                    // l'attacco si risolvesse (460ms dopo) si moriva comunque,
+                    // dando l'impressione di una morte a tradimento. La morte è
+                    // già garantita dal timer qui sotto (ai.attackResolved),
+                    // quindi non serve bloccare i controlli in anticipo:
+                    // showGameOverScreen() fa già l'unlock al momento giusto,
+                    // quando la schermata di game over appare davvero.
+                    this._dispatchGlobalEvent('mostroAttacca', { mostro: mostroMesh });
+                }
             }
         }
 
@@ -506,7 +558,19 @@ export class PlayerController {
 
         mostroMesh.lookAt(this.camera.position.x, mostroMesh.position.y, this.camera.position.z);
 
-        const monsterSize  = new THREE.Vector3(1.2, 2.8, 1.2);
+        // NB (Regista): l'ingombro qui è più largo del semplice corpo "rigido"
+        // del mostro apposta — le braccia/gambe animate (camminata, idle)
+        // oscillano oltre il centro del modello, e un margine troppo stretto
+        // le faceva sporgere visibilmente attraverso muri/porte vicine.
+        // ATTENZIONE: non alzare oltre ~1.6-1.7. Il vano porta è largo 2.4,
+        // ma quando il mostro deve attraversarlo IN DIAGONALE (es. stanze a
+        // L con due porte ad angolo) lo spazio effettivo richiesto cresce
+        // con l'angolo — con gli angoli di sterzata usati qui (fino a ~46°)
+        // un ingombro di 2.0 rende IMPOSSIBILE ogni direzione del ventaglio,
+        // incastrando il mostro alla porta invece di fargli attraversare.
+        // 1.5 è il compromesso sicuro: molto meglio di 1.2 per il clipping,
+        // ma resta sotto la soglia critica per gli attraversamenti in diagonale.
+        const monsterSize  = new THREE.Vector3(1.5, 2.8, 1.5);
         const RAY_LEN      = 2.5;  // distanza di "vista" davanti al mostro
         const STEER_ANGLES = [-0.8, -0.4, 0, 0.4, 0.8]; // ventaglio di 5 raggi (rad)
         const baseDir      = toPlayer.clone().normalize();

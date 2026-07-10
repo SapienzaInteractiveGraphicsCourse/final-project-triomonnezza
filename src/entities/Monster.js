@@ -274,11 +274,20 @@ export class Monster {
     _stopAllTweens() {
         this._tweenGroup.removeAll();
         this.testa.rotation.x = 0;
+        this.testa.rotation.z = 0;
         this.testa.position.z = 0;
         this.corpo.position.z = 0;
         this.corpo.position.y = 0;
         this.braccioSx.rotation.z = 0;
         this.braccioDx.rotation.z = 0;
+
+        // Ferma anche gli spasmi idle programmati (Regista): altrimenti un
+        // timer già in attesa potrebbe scattare più tardi mentre il mostro
+        // è ormai in camminata/attacco, causando un piccolo scatto fuori luogo.
+        if (this._idleSpasmTimeoutId) {
+            clearTimeout(this._idleSpasmTimeoutId);
+            this._idleSpasmTimeoutId = null;
+        }
     }
 
     /**
@@ -293,43 +302,45 @@ export class Monster {
         const dur = 380; // ms per mezza oscillazione (velocità del passo)
 
         // Braccio sinistro: parte da 0, va in avanti
+        // (ampiezza ridotta rispetto a prima — Regista: le braccia
+        // "sporgevano" troppo lateralmente vicino a muri/porte strette)
         new TWEEN.Tween(this.braccioSx.rotation, this._tweenGroup)
-            .to({ x: 0.65 }, dur)
+            .to({ x: 0.45 }, dur)
             .easing(TWEEN.Easing.Sinusoidal.InOut)
             .yoyo(true).repeat(Infinity)
             .start();
 
         // Braccio destro: parte dal lato opposto (fase sfasata di 180°)
         new TWEEN.Tween(this.braccioDx.rotation, this._tweenGroup)
-            .to({ x: -0.65 }, dur)
+            .to({ x: -0.45 }, dur)
             .easing(TWEEN.Easing.Sinusoidal.InOut)
             .yoyo(true).repeat(Infinity)
             .start();
 
         // Avanbraccio sinistro: si flette in sincrono col braccio
         new TWEEN.Tween(this.avanbraccioSx.rotation, this._tweenGroup)
-            .to({ x: -0.45 }, dur)
+            .to({ x: -0.32 }, dur)
             .easing(TWEEN.Easing.Sinusoidal.InOut)
             .yoyo(true).repeat(Infinity)
             .start();
 
         // Avanbraccio destro: fase opposta
         new TWEEN.Tween(this.avanbraccioDx.rotation, this._tweenGroup)
-            .to({ x: 0.1 }, dur)
+            .to({ x: 0.07 }, dur)
             .easing(TWEEN.Easing.Sinusoidal.InOut)
             .yoyo(true).repeat(Infinity)
             .start();
 
         // Gamba sinistra: opposta al braccio sinistro (camminata naturale)
         new TWEEN.Tween(this.gambaSx.rotation, this._tweenGroup)
-            .to({ x: -0.55 }, dur)
+            .to({ x: -0.4 }, dur)
             .easing(TWEEN.Easing.Sinusoidal.InOut)
             .yoyo(true).repeat(Infinity)
             .start();
 
         // Gamba destra: opposta alla sinistra
         new TWEEN.Tween(this.gambaDx.rotation, this._tweenGroup)
-            .to({ x: 0.55 }, dur)
+            .to({ x: 0.4 }, dur)
             .easing(TWEEN.Easing.Sinusoidal.InOut)
             .yoyo(true).repeat(Infinity)
             .start();
@@ -339,7 +350,7 @@ export class Monster {
         // "apice" dell'oscillazione anziché restare rigide come un blocco
         // unico — sfrutta il nuovo giunto ginocchio→stinco della gerarchia.
         new TWEEN.Tween(this.ginocchioSx.rotation, this._tweenGroup)
-            .to({ x: 0.55 }, dur / 2)
+            .to({ x: 0.4 }, dur / 2)
             .easing(TWEEN.Easing.Sinusoidal.InOut)
             .yoyo(true).repeat(Infinity)
             .start();
@@ -347,7 +358,7 @@ export class Monster {
         // Sfasata di un quarto di ciclo rispetto alla sinistra, per non
         // piegarsi esattamente in sincrono con l'altro ginocchio.
         new TWEEN.Tween(this.ginocchioDx.rotation, this._tweenGroup)
-            .to({ x: 0.55 }, dur / 2)
+            .to({ x: 0.4 }, dur / 2)
             .delay(dur / 2)
             .easing(TWEEN.Easing.Sinusoidal.InOut)
             .yoyo(true).repeat(Infinity)
@@ -426,6 +437,122 @@ export class Monster {
             .easing(TWEEN.Easing.Sinusoidal.InOut)
             .yoyo(true).repeat(Infinity)
             .start();
+
+        // Spasmi/tic casuali (Regista): rompono la prevedibilità del loop
+        // perfettamente ciclico — molto più inquietante di un idle "pulito".
+        this._scheduleIdleSpasm();
+    }
+
+    /**
+     * Programma il prossimo spasmo idle a un intervallo casuale (3-8s).
+     * Si auto-richiama per il successivo, ma solo finché il mostro resta
+     * effettivamente in idle (controllato ad ogni scatto): se nel frattempo
+     * inizia a camminare/attaccare, il timer pendente viene comunque
+     * cancellato da _stopAllTweens(), quindi questo controllo è una
+     * doppia sicurezza.
+     */
+    _scheduleIdleSpasm() {
+        if (this._idleSpasmTimeoutId) clearTimeout(this._idleSpasmTimeoutId);
+        const delay = 3000 + Math.random() * 5000; // ogni 3-8 secondi
+        this._idleSpasmTimeoutId = setTimeout(() => {
+            if (this._animState !== 'idle') return;
+            this._playIdleSpasm();
+            this._scheduleIdleSpasm();
+        }, delay);
+    }
+
+    /**
+     * Un singolo spasmo: uno scatto rapido e innaturale di un arto scelto a
+     * caso, che torna subito in posizione (yoyo). Gira sullo stesso
+     * TWEEN.Group isolato del mostro, sovrapposto ai loop lenti del respiro/
+     * ondeggiamento idle già attivi — l'effetto è proprio quello voluto: un
+     * piccolo scatto imprevedibile che "rompe" la calma per un istante,
+     * poi il loop idle regolare riprende naturalmente il controllo.
+     */
+    _playIdleSpasm() {
+        const dur = 80;
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        const choice = Math.random();
+
+        if (choice < 0.4) {
+            // Scatto della testa
+            new TWEEN.Tween(this.testa.rotation, this._tweenGroup)
+                .to({ z: 0.18 * dir }, dur)
+                .yoyo(true).repeat(1)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .start();
+        } else if (choice < 0.7) {
+            // Scatto braccio sinistro
+            new TWEEN.Tween(this.braccioSx.rotation, this._tweenGroup)
+                .to({ x: 0.35 }, dur)
+                .yoyo(true).repeat(1)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .start();
+        } else {
+            // Scatto braccio destro
+            new TWEEN.Tween(this.braccioDx.rotation, this._tweenGroup)
+                .to({ x: 0.35 }, dur)
+                .yoyo(true).repeat(1)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .start();
+        }
+    }
+
+    /**
+     * Animazione di "SHOCK" (one-shot, breve): il mostro sussulta nell'istante
+     * in cui nota il giocatore per la prima volta — la testa scatta di lato,
+     * il busto si ritrae e le braccia si alzano di scatto, poi tutto si
+     * riassesta. Chiamata da main.js sull'evento 'mostroNotaGiocatore'
+     * (PlayerController rileva il momento esatto in cui il giocatore entra
+     * nel raggio di aggro). Dura molto meno dell'attacco: è un sussulto, non
+     * un colpo.
+     */
+    notice() {
+        this._stopAllTweens();
+        this._animState = 'notice';
+
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        const snapDur   = 90;  // scatto rapido, uno spavento
+        const settleDur = 200; // si riassesta
+
+        const snapTesta = new TWEEN.Tween(this.testa.rotation, this._tweenGroup)
+            .to({ z: 0.25 * dir, x: -0.15 }, snapDur)
+            .easing(TWEEN.Easing.Quadratic.Out);
+        const snapCorpo = new TWEEN.Tween(this.corpo.position, this._tweenGroup)
+            .to({ z: 0.15, y: 0.04 }, snapDur)
+            .easing(TWEEN.Easing.Quadratic.Out);
+        const snapBraccioSx = new TWEEN.Tween(this.braccioSx.rotation, this._tweenGroup)
+            .to({ x: 0.3 }, snapDur)
+            .easing(TWEEN.Easing.Quadratic.Out);
+        const snapBraccioDx = new TWEEN.Tween(this.braccioDx.rotation, this._tweenGroup)
+            .to({ x: 0.3 }, snapDur)
+            .easing(TWEEN.Easing.Quadratic.Out);
+
+        const settleTesta = new TWEEN.Tween(this.testa.rotation, this._tweenGroup)
+            .to({ z: 0, x: 0 }, settleDur)
+            .easing(TWEEN.Easing.Quadratic.InOut);
+        const settleCorpo = new TWEEN.Tween(this.corpo.position, this._tweenGroup)
+            .to({ z: 0, y: 0 }, settleDur)
+            .easing(TWEEN.Easing.Quadratic.InOut);
+        const settleBraccioSx = new TWEEN.Tween(this.braccioSx.rotation, this._tweenGroup)
+            .to({ x: 0 }, settleDur)
+            .easing(TWEEN.Easing.Quadratic.InOut);
+        const settleBraccioDx = new TWEEN.Tween(this.braccioDx.rotation, this._tweenGroup)
+            .to({ x: 0 }, settleDur)
+            .easing(TWEEN.Easing.Quadratic.InOut)
+            .onComplete(() => {
+                this._animState = null; // rilascia il lock: idle/camminata riprendono normalmente
+            });
+
+        snapTesta.chain(settleTesta);
+        snapCorpo.chain(settleCorpo);
+        snapBraccioSx.chain(settleBraccioSx);
+        snapBraccioDx.chain(settleBraccioDx);
+
+        snapTesta.start();
+        snapCorpo.start();
+        snapBraccioSx.start();
+        snapBraccioDx.start();
     }
 
     /**
@@ -539,8 +666,9 @@ export class Monster {
      * @param {boolean} isMoving  - true se il mostro sta inseguendo il player
      */
     update(deltaTime, isMoving) {
-        // Non interrompere un'animazione di attacco già in corso
-        if (this._animState !== 'attack') {
+        // Non interrompere un'animazione di attacco o di shock già in corso
+        const isLocked = this._animState === 'attack' || this._animState === 'notice';
+        if (!isLocked) {
             if (isMoving && this._animState !== 'walk') {
                 this._startWalkAnimation();
             } else if (!isMoving && this._animState !== 'idle') {
@@ -565,7 +693,7 @@ export class Monster {
         // "cammina a testa in giù" osservato, a volte sì a volte no a
         // seconda dell'angolo). corpo.rotation.x non è mai toccato da
         // nessun altro sistema (lookAt, attacco, camminata): zero conflitti.
-        const targetLean = (isMoving && this._animState !== 'attack') ? 0.16 : 0;
+        const targetLean = (isMoving && !isLocked) ? 0.16 : 0;
         this._currentLean = this._currentLean ?? 0;
         this._currentLean += (targetLean - this._currentLean) * Math.min(1, deltaTime * 5);
         this._currentLean = Math.max(-0.3, Math.min(0.3, this._currentLean));
