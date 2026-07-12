@@ -168,7 +168,7 @@ export class GameUIController {
 
         // Item picked up
         document.addEventListener('itemRaccolto', (e) => {
-            const idChiave = e.detail.id;
+            const idChiave = e.detail.idChiave;
             
             if (idChiave === 'batteria') {
                 this.showMessage('Battery found! Flashlight fully recharged.');
